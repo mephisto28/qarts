@@ -1,0 +1,6 @@
+{
+    "quotation_prefix": "/mnt/nvme03/tdata/02_Processed/99_Training/1min_v4__pca1D_5_total__barra4_total/",
+    "prediction_prefix": "/home/zwshi/projects/tdata2/99_Daily/03_modeling/output/",
+
+    "date_format": "%Y%m%d"
+}

@@ -1,0 +1,182 @@
+import typing as T
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+from pandas.core.groupby import DataFrameGroupBy
+
+
+@dataclass
+class PanelDataIndexed:
+    data: pd.DataFrame | pd.Series
+    order: str  # 'datetime-first' or 'instrument-first' or None
+
+    def __post_init__(self):
+        assert self.data.index.names[0] == 'datetime'
+        assert self.data.index.names[1] == 'instrument'
+
+    def ensure_order(self, order: str):
+        self.order = order
+        if order == 'datetime-first':
+            datetime_idx = self.data.index.get_level_values('datetime')
+            if not datetime_idx.is_monotonic_increasing:
+                self.data.sort_index(level='datetime', inplace=True)
+        elif order == 'instrument-first':
+            instrument_idx = self.data.index.get_level_values('instrument')
+            if not instrument_idx.is_monotonic_increasing:
+                self.data.sort_index(level='instrument', inplace=True)
+        elif order != 'none':
+            raise ValueError(f"Invalid order: {order}")
+
+    def intersect_index(self, other: 'PanelDataIndexed') -> pd.MultiIndex:
+        common_index = self.data.index.intersection(other.data.index)
+        return common_index
+
+    def align_index(self, index: pd.MultiIndex) -> 'PanelDataIndexed':
+        df = self.data.loc[index]
+        block = PanelDataIndexed(df, order=self.order)
+        block.ensure_order(self.order)
+        return block
+
+
+@dataclass
+class PanelSeriesIndexed(PanelDataIndexed):
+    data: pd.Series
+    field: T.Optional[str] = None
+    order: str = 'none'  # 'datetime-first' or 'instrument-first' or None
+
+
+@dataclass
+class PanelBlockIndexed(PanelDataIndexed):
+    data: pd.DataFrame # (NxT, F) dataframe with multi-index (datetime, instrument)
+    order: str = 'none' # 'datetime-first' or 'instrument-first' or None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.fields = list(self.data.columns)
+
+    def get_field(self, field: str) -> PanelSeriesIndexed:
+        return PanelSeriesIndexed(self.data[field], field=field, order=self.order)
+    
+    def get_cross_sectional_groups(self) -> DataFrameGroupBy:
+        return self.data.groupby(level='datetime')
+
+    def get_instrument(self, instrument: str) -> pd.DataFrame:
+        f = self.data.index.get_level_values('instrument') == instrument
+        return self.data[f]
+
+    def get_fields(self, fields: list[str]) -> 'PanelBlockIndexed':
+        return PanelBlockIndexed(self.data[fields], order=self.order)
+        
+    def merge(self, other: T.Union['PanelBlockIndexed', 'PanelSeriesIndexed'], how: str = 'left') -> 'PanelBlockIndexed':
+        merged_df = self.data.join(other.data, how=how)
+        return PanelBlockIndexed(merged_df, order=self.order)
+
+    @classmethod
+    def from_dataframe(cls, df, src='df'):
+        if isinstance(df.index, pd.MultiIndex):
+            assert df.index.names[0] == 'datetime'
+            assert df.index.names[1] == 'instrument'
+            return PanelBlockIndexed(df, order='datetime-first')
+        else:
+            valid_datetime_cols = ['datetime', 'timestamp']
+            if not df.index.name in valid_datetime_cols:
+                valid_datetime_cols = [c for c in valid_datetime_cols if c in df.columns]
+                if len(valid_datetime_cols) == 0:
+                    raise ValueError(f"No valid datetime column found in {src}, available columns: {df.columns}")
+                datetime_col = valid_datetime_cols[0]
+                df.set_index(datetime_col, inplace=True)
+
+            valid_instrument_cols = ['instrument', 'instruments', 'stock_code']
+            valid_instrument_cols = [c for c in valid_instrument_cols if c in df.columns]
+            if len(valid_instrument_cols) == 0:
+                raise ValueError(f"No valid instrument column found in {src}, available columns: {df.columns}")
+            instrument_col = valid_instrument_cols[0]
+            df.set_index(instrument_col, append=True, inplace=True)
+            df.index.names = ['datetime', 'instrument']
+        return PanelBlockIndexed(df, order='datetime-first')
+
+    @classmethod
+    def from_series_list(cls, s_list: list[PanelSeriesIndexed], src='s_list') -> 'PanelBlockIndexed':
+        names = ', '.join([s.field for s in s_list])
+        df = pd.DataFrame({s.field: s.data for s in s_list})
+        return cls.from_dataframe(df, src=names)
+
+
+@dataclass
+class PanelBlockDense:
+
+    instruments: np.ndarray
+    timestamps: np.ndarray
+    blocks: np.ndarray # (F, N, T) to accelerate f(row-wise) access
+    fields: list[str]
+    frequency: str
+    
+    def get_view(self, field: T.Optional[str]) -> np.ndarray:
+        if field is None:
+            return self.blocks
+        field_idx = self.fields.index(field)
+        return self.blocks[field_idx]
+
+    def get_current_view(self, field: T.Optional[str] = None, window: int = 1) -> np.ndarray:
+        block = self.get_view(field)
+        if window == 1:
+            return block[:, self.cursor]
+        else:
+            start_idx = max(0, self.cursor - window + 1)
+            end_idx = min(self.cursor + 1, block.shape[2])
+            return block[:, :, start_idx:end_idx]
+
+    def get_copy(self, fields: T.Optional[list[str]] = None) -> 'PanelBlockDense':
+        if fields is None:
+            fields = self.fields
+        fields_idx = [self.fields.index(field) for field in fields]
+        return PanelBlockDense(
+            instruments=self.instruments,
+            timestamps=self.timestamps,
+            blocks=self.blocks[fields_idx],
+            fields=fields,
+            frequency=self.frequency
+        )
+
+    def get_dataframe(self, instrument: str = None, timestamp: pd.Timestamp | int = None) -> pd.DataFrame:
+        assert timestamp is not None or instrument is not None, "Either timestamp or instrument must be provided"
+        if instrument is not None:
+            data = self.blocks[instrument].T
+            index = self.timestamps
+        else:
+            cursor = self.cursor
+            if timestamp is not None:
+                cursor = np.searchsorted(self.timestamps, timestamp)
+            data = self.blocks[..., cursor].T
+            index = self.instruments
+        return pd.DataFrame(data, index=index, columns=self.fields)
+
+    def from_sparse_block(self, block: PanelBlockIndexed) -> 'PanelBlockDense':
+        raise NotImplementedError("from_sparse_block is not implemented yet")
+
+
+
+@dataclass
+class IntradayPanelBlockIndexed(PanelBlockIndexed):
+    pass
+
+
+@dataclass
+class DailyPanelBlockIndexed(PanelBlockIndexed):
+    pass
+
+
+@dataclass
+class DailyPanelBlockDense(PanelBlockDense):
+    pass
+
+
+@dataclass
+class FactorPanelBlockIndexed(PanelBlockIndexed):
+    pass
+
+
+@dataclass
+class FactorPanelBlockDense(PanelBlockDense):
+    pass
