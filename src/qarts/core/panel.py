@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from pandas.core.groupby import DataFrameGroupBy
 
+from .convert_utils import build_ranges, make_time_grid, densify_features_from_df
+
 
 @dataclass
 class PanelDataIndexed:
@@ -14,6 +16,14 @@ class PanelDataIndexed:
     def __post_init__(self):
         assert self.data.index.names[0] == 'datetime'
         assert self.data.index.names[1] == 'instrument'
+
+    @property
+    def datetime(self) -> pd.Index:
+        return self.data.index.get_level_values('datetime')
+
+    @property
+    def instrument(self) -> pd.Index:
+        return self.data.index.get_level_values('instrument')
 
     def ensure_order(self, order: str):
         self.order = order
@@ -108,15 +118,15 @@ class PanelBlockDense:
 
     instruments: np.ndarray
     timestamps: np.ndarray
-    blocks: np.ndarray # (F, N, T) to accelerate f(row-wise) access
+    data: np.ndarray # (F, N, T) to accelerate f(row-wise) access
     fields: list[str]
     frequency: str
     
     def get_view(self, field: T.Optional[str]) -> np.ndarray:
         if field is None:
-            return self.blocks
+            return self.data
         field_idx = self.fields.index(field)
-        return self.blocks[field_idx]
+        return self.data[field_idx]
 
     def get_current_view(self, field: T.Optional[str] = None, window: int = 1) -> np.ndarray:
         block = self.get_view(field)
@@ -134,7 +144,7 @@ class PanelBlockDense:
         return PanelBlockDense(
             instruments=self.instruments,
             timestamps=self.timestamps,
-            blocks=self.blocks[fields_idx],
+            data=self.data[fields_idx],
             fields=fields,
             frequency=self.frequency
         )
@@ -142,19 +152,51 @@ class PanelBlockDense:
     def get_dataframe(self, instrument: str = None, timestamp: pd.Timestamp | int = None) -> pd.DataFrame:
         assert timestamp is not None or instrument is not None, "Either timestamp or instrument must be provided"
         if instrument is not None:
-            data = self.blocks[instrument].T
+            data = self.data[instrument].T
             index = self.timestamps
         else:
             cursor = self.cursor
             if timestamp is not None:
                 cursor = np.searchsorted(self.timestamps, timestamp)
-            data = self.blocks[..., cursor].T
+            data = self.data[..., cursor].T
             index = self.instruments
         return pd.DataFrame(data, index=index, columns=self.fields)
+    
+    @classmethod
+    def from_indexed_block(
+        cls, 
+        block: PanelBlockIndexed,
+        required_columns: list[str],
+        fill_methods: list[str],
+        frequency: str = '1min', 
+        inst_cats: np.ndarray = None,
+        is_intraday: bool = False
+    ) -> 'PanelBlockDense':
 
-    def from_sparse_block(self, block: PanelBlockIndexed) -> 'PanelBlockDense':
-        raise NotImplementedError("from_sparse_block is not implemented yet")
-
+        if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
+            trading_date = block.datetime.iloc[0].date()
+            timestamps = make_time_grid(trading_date, frequency=frequency)
+        elif isinstance(block, DailyPanelBlockIndexed) or isinstance(block, PanelBlockIndexed):
+            timestamps = block.datetime.unique().sort_values().values
+        else:
+            raise ValueError(f"Invalid block type: {type(block)}")
+        grid_ns = timestamps.astype("datetime64[ns]").view("int64")
+        
+        inst = block.instrument
+        if inst_cats is None:
+            inst_cats = inst.unique().sort_values()
+        inst_code = pd.Categorical(inst, categories=inst_cats, ordered=True).codes.astype(np.int32)
+        n_inst = len(inst_cats)
+        starts, ends = build_ranges(inst_code, n_inst)
+        values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods)
+        
+        return PanelBlockDense(
+            instruments=inst_cats,
+            timestamps=timestamps,
+            data=values,
+            fields=required_columns,
+            frequency=frequency
+        )
 
 
 @dataclass
