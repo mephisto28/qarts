@@ -3,11 +3,11 @@ import typing as T
 from dataclasses import dataclass, field
 
 import pandas as pd
-from qarts.core import PanelBlockIndexed
+from qarts.core import PanelBlockIndexed, DailyPanelBlockIndexed
 
-@T.runtime_checkable
+
 @dataclass
-class VariableLoadSpec(T.Protocol):
+class VariableLoadSpec:
     var_type: str
     load_kwargs: dict = field(default_factory=dict)
 
@@ -49,7 +49,7 @@ class PanelLoader(T.Protocol):
     def save_intraday_quotation(self, block: PanelBlockIndexed, date: datetime.date | str) -> None:
         raise NotImplementedError
         
-    def load_intraday_quotation(self, date: datetime.date | str, instruments: T.Optional[str] = None) -> PanelBlockIndexed:
+    def load_intraday_quotation(self, date: datetime.date | str, instruments: T.Optional[str] = None, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         raise NotImplementedError
 
     def save_intraday_prediction(self, block: PanelBlockIndexed, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> None:
@@ -65,6 +65,18 @@ class PanelLoader(T.Protocol):
         raise NotImplementedError
 
     def load_intraday_prediction_with_quotations(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> PanelBlockIndexed:
+        raise NotImplementedError
+
+    def load_daily_quotation(self, start_date: datetime.date | str = None, end_date: datetime.date | str = None, instruments: T.Optional[str] = None, fields: T.Optional[list[str]] = None) -> DailyPanelBlockIndexed:
+        raise NotImplementedError
+
+    def save_daily_quotation(self, block: PanelBlockIndexed, date: datetime.date | str) -> None:
+        raise NotImplementedError
+
+    def load_daily_factor(self, factor: str, date: datetime.date | str) -> PanelBlockIndexed:
+        raise NotImplementedError
+
+    def save_daily_factor(self, block: PanelBlockIndexed, factor: str, date: datetime.date | str) -> None:
         raise NotImplementedError
     
     def convert_dataframe_to_block(self, df: pd.DataFrame, src='df') -> PanelBlockIndexed:

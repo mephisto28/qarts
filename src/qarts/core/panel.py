@@ -1,3 +1,4 @@
+import datetime
 import typing as T
 from dataclasses import dataclass
 
@@ -18,12 +19,17 @@ class PanelDataIndexed:
         assert self.data.index.names[1] == 'instrument'
 
     @property
-    def datetime(self) -> pd.Index:
+    def datetimes(self) -> pd.Index:
         return self.data.index.get_level_values('datetime')
 
     @property
-    def instrument(self) -> pd.Index:
+    def instruments(self) -> pd.Index:
         return self.data.index.get_level_values('instrument')
+
+    def between(self, start_date: datetime.date | str = None, end_date: datetime.date | str = None) -> 'PanelDataIndexed':
+        self.ensure_order('datetime-first')
+        df = self.data.loc[start_date:end_date].copy()
+        return type(self)(df, order='datetime-first')
 
     def ensure_order(self, order: str):
         self.order = order
@@ -76,7 +82,7 @@ class PanelBlockIndexed(PanelDataIndexed):
         return self.data[f]
 
     def get_fields(self, fields: list[str]) -> 'PanelBlockIndexed':
-        return PanelBlockIndexed(self.data[fields], order=self.order)
+        return type(self)(self.data[fields], order=self.order)
         
     def merge(self, other: T.Union['PanelBlockIndexed', 'PanelSeriesIndexed'], how: str = 'left') -> 'PanelBlockIndexed':
         merged_df = self.data.join(other.data, how=how)
@@ -121,6 +127,12 @@ class PanelBlockDense:
     data: np.ndarray # (F, N, T) to accelerate f(row-wise) access
     fields: list[str]
     frequency: str
+    cursor: int = -1
+
+    def __post_init__(self):
+        assert isinstance(self.instruments, np.ndarray)
+        assert isinstance(self.timestamps, np.ndarray)
+        assert isinstance(self.fields, list)        
     
     def get_view(self, field: T.Optional[str]) -> np.ndarray:
         if field is None:
@@ -161,6 +173,16 @@ class PanelBlockDense:
             data = self.data[..., cursor].T
             index = self.instruments
         return pd.DataFrame(data, index=index, columns=self.fields)
+
+    @classmethod
+    def init_empty_from_context(cls, instruments: np.ndarray, timestamps: np.ndarray, fields: list[str], freq: str) -> 'PanelBlockDense':
+        return PanelBlockDense(
+            instruments=instruments,
+            timestamps=timestamps,
+            data=np.empty((len(fields), len(instruments), len(timestamps)), dtype=np.float32),
+            fields=fields,
+            frequency=freq
+        )
     
     @classmethod
     def from_indexed_block(
@@ -174,15 +196,15 @@ class PanelBlockDense:
     ) -> 'PanelBlockDense':
 
         if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
-            trading_date = block.datetime.iloc[0].date()
+            trading_date = block.datetimes[0].date()
             timestamps = make_time_grid(trading_date, frequency=frequency)
         elif isinstance(block, DailyPanelBlockIndexed) or isinstance(block, PanelBlockIndexed):
-            timestamps = block.datetime.unique().sort_values().values
+            timestamps = block.datetimes.unique().sort_values().values
         else:
             raise ValueError(f"Invalid block type: {type(block)}")
         grid_ns = timestamps.astype("datetime64[ns]").view("int64")
         
-        inst = block.instrument
+        inst = block.instruments
         if inst_cats is None:
             inst_cats = inst.unique().sort_values()
         inst_code = pd.Categorical(inst, categories=inst_cats, ordered=True).codes.astype(np.int32)
@@ -191,7 +213,7 @@ class PanelBlockDense:
         values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods)
         
         return PanelBlockDense(
-            instruments=inst_cats,
+            instruments=np.array(inst_cats),
             timestamps=timestamps,
             data=values,
             fields=required_columns,
@@ -206,6 +228,23 @@ class IntradayPanelBlockIndexed(PanelBlockIndexed):
 
 @dataclass
 class DailyPanelBlockIndexed(PanelBlockIndexed):
+
+    @classmethod
+    def from_base_block(cls, block: PanelBlockIndexed) -> 'DailyPanelBlockIndexed':
+        return DailyPanelBlockIndexed(block.data, order=block.order)
+    
+    def adjust_field_by_last(self, fields: str):
+        daily_df = self.data
+        last_factor = daily_df.groupby(level='instrument', sort=False)['factor'].transform('last')
+        factor = daily_df['factor']
+        for field in fields:
+            new_field = 'adjusted_' + field
+            daily_df[new_field] = daily_df[field] / factor * last_factor
+            if new_field not in self.fields:
+                self.fields.append(new_field)
+
+@dataclass
+class IntradayPanelBlockDense(PanelBlockDense):
     pass
 
 

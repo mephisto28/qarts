@@ -5,6 +5,7 @@ import typing as T
 
 import pandas as pd
 from loguru import logger
+from qarts.core import IntradayPanelBlockIndexed, DailyPanelBlockIndexed
 from .dataloader import PanelLoader, PanelBlockIndexed, VariableLoadSpec
 
 
@@ -46,6 +47,9 @@ class ParquetPanelLoader(PanelLoader):
         available_files = None
         for spec in specs:
             dir = self.get_dir(spec.var_type, **spec.load_kwargs)
+            if not os.path.exists(dir):
+                return []
+
             files = os.listdir(dir)
             available_files = set(files) if available_files is None else available_files.intersection(files)
 
@@ -68,15 +72,15 @@ class ParquetPanelLoader(PanelLoader):
             os.makedirs(dir, exist_ok=True)
         block.data.to_parquet(dst)
 
-    def load_indexed_block_from_path(self, path: str) -> PanelBlockIndexed:
-        df = pd.read_parquet(path)
+    def load_indexed_block_from_path(self, path: str, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
+        df = pd.read_parquet(path, columns=fields)
         return self.convert_dataframe_to_block(df, src=path)
 
-    def load_intraday_quotation(self, date: datetime.date | str, instruments: T.Optional[str] = None) -> PanelBlockIndexed:
+    def load_intraday_quotation(self, date: datetime.date | str, instruments: T.Optional[str] = None, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         dir = self.get_dir('quotation')
         date_str = date.strftime('%Y%m%d') if isinstance(date, datetime.date) else date
         path = os.path.join(dir, f'{date_str}.parquet')
-        return self.load_indexed_block_from_path(path)
+        return self.load_indexed_block_from_path(path, fields=fields)
 
     def save_intraday_quotation(self, block: PanelBlockIndexed, date: datetime.date | str) -> None:
         dir = self.get_dir('quotation')
@@ -112,3 +116,9 @@ class ParquetPanelLoader(PanelLoader):
         prediction_block = self.load_intraday_prediction(model, epoch, date, use_ema=use_ema)
         quotation_block = self.load_intraday_quotation(date)
         return prediction_block.merge(quotation_block)
+
+    def load_daily_quotation(self, start_date: datetime.date | str = None, end_date: datetime.date | str = None, instruments: T.Optional[str] = None, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
+        if any([f is not None for f in [start_date, end_date, instruments]]):
+            logger.warning("load_daily_quotation with start_date, end_date, or instruments is not supported by parquet loader, will load all daily quotations")
+        return DailyPanelBlockIndexed.from_base_block(
+            self.load_indexed_block_from_path(self.config['daily_quotation_path'], fields=fields))

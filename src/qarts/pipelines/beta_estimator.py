@@ -21,6 +21,7 @@ class IntradayNeutralizeSpec:
     name: str
     use_intercept: bool = True
     neutralize_coef: float = 1.0
+    disable_on_positive: bool = False
 
 
 @dataclass
@@ -32,10 +33,11 @@ class IntradayNeutralizeOutputSpec:
 
 class CrossSectionalBetaEstimator:
 
-    def __init__(self, use_intercept: bool = True, min_samples: int = 500, neutralize_coef: float = 1.0):
+    def __init__(self, use_intercept: bool = True, min_samples: int = 500, neutralize_coef: float = 1.0, disable_on_positive: bool = False):
         self.min_samples = min_samples
         self.use_intercept = use_intercept
         self.neutralize_coef = neutralize_coef
+        self.disable_on_positive = disable_on_positive
 
     def _compute_beta(self, df: pd.DataFrame, target: str, inputs: list[str]):
         X = df[inputs.fields].to_numpy(dtype=np.float32)
@@ -44,9 +46,13 @@ class CrossSectionalBetaEstimator:
             X1 = np.column_stack([np.ones(len(y)), X])
         else:
             X1 = X
-        beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+        beta, *_ = np.linalg.lstsq(X1, y, rcond=None)
         corrs = [np.corrcoef(X[:, i], y)[0, 1] for i in range(X.shape[1])]
+        if self.disable_on_positive:
+            beta = np.minimum(beta, 0)
         residual = y - X1 @ beta * self.neutralize_coef
+        if self.use_intercept:
+            beta = beta[1:]
         return beta, corrs, residual
 
     def predict(
@@ -81,8 +87,6 @@ class CrossSectionalBetaEstimator:
         residual_df.index.names = ['datetime', 'instrument']
 
         columns = [f'beta_{f}' for f in inputs.fields]
-        if self.use_intercept:
-            columns = ['intercept'] + columns
         beta_df = pd.DataFrame(betas, index=datetimes, columns=[f'beta_{f}' for f in columns])
         beta_df.index = beta_df.index.time
         corr_df = pd.DataFrame(corrs_list, index=datetimes, columns=inputs.fields)
@@ -136,6 +140,7 @@ class IntradayNeutralizer:
                 beta_estimator = CrossSectionalBetaEstimator(
                     use_intercept=out_spec.use_intercept,
                     neutralize_coef=out_spec.neutralize_coef,
+                    disable_on_positive=out_spec.disable_on_positive,
                 )
                 results = beta_estimator.predict(inputs, target)
                 residual_series = PanelSeriesIndexed(results['residuals'], field=out_spec.name)
@@ -156,7 +161,7 @@ if __name__ == '__main__':
 
     inputs = IntradayVariableSpec(var_type='quotation', fields=['1min_v4_barra4_total'])
     targets = IntradayVariableSpec(var_type='prediction', fields=[f'pred_{i}' for i in range(7)] + [f'gt_{i}' for i in range(7)], load_kwargs={'model': '518.c', 'epoch': 1})
-    specs = [IntradayNeutralizeSpec(name=f'pred_{i}', use_intercept=False, neutralize_coef=0.7) for i in range(7)] + \
+    specs = [IntradayNeutralizeSpec(name=f'pred_{i}', use_intercept=True, neutralize_coef=0.7, disable_on_positive=True) for i in range(7)] + \
         [IntradayNeutralizeSpec(name=f'gt_{i}', use_intercept=False, neutralize_coef=0) for i in range(7)]
-    output_spec = IntradayNeutralizeOutputSpec(var_type='prediction', specs=specs, load_kwargs={'model': '518.c.n', 'epoch': 1})
+    output_spec = IntradayNeutralizeOutputSpec(var_type='prediction', specs=specs, load_kwargs={'model': '518.c.n3', 'epoch': 1})
     intraday_neutralizer.run([inputs], [targets], output_spec)
