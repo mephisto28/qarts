@@ -4,7 +4,8 @@ import typing as T
 from dataclasses import dataclass, field
 
 import numpy as np
-from qarts.modeling.factors.context import FactorContext
+from qarts.modeling.factors.context import FactorContext, ContextSrc
+
 
 @dataclass
 class FactorSpec:
@@ -16,9 +17,12 @@ class FactorSpec:
 
 class Factor(metaclass=abc.ABCMeta):
 
-    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, scale: float = 1.0, shift: float = 0.0, need_cache: bool = False, **kwargs):
         self.window = window
         self.input_fields = input_fields
+        self.scale = scale
+        self.shift = shift
+        self.need_cache = need_cache
         self.params = kwargs
         self._sources = list(self.input_fields.keys())
         self._check_inputs_valid()
@@ -37,6 +41,25 @@ class Factor(metaclass=abc.ABCMeta):
     @property
     def sources(self) -> list[str]:
         return self._sources
+
+
+class FactorFromDailyAndIntraday(Factor):
+
+    num_daily_fields: int = -1
+    num_intraday_fields: int = -1
+
+    def _check_inputs_valid(self):
+        if self.num_daily_fields > 0:
+            assert len(self.input_fields[ContextSrc.DAILY_QUOTATION]) == self.num_daily_fields
+        else:
+            if ContextSrc.DAILY_QUOTATION in self.input_fields:
+                assert len(self.input_fields[ContextSrc.DAILY_QUOTATION]) == 0
+                
+        if self.num_intraday_fields > 0:
+            assert len(self.input_fields[ContextSrc.INTRADAY_QUOTATION]) == self.num_intraday_fields
+        else:
+            if ContextSrc.INTRADAY_QUOTATION in self.input_fields:
+                assert len(self.input_fields[ContextSrc.INTRADAY_QUOTATION]) == 0
 
 
 _factors_registry: T.Dict[str, type['Factor']] = {}
