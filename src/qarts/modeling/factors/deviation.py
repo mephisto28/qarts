@@ -4,7 +4,8 @@ import typing as T
 
 import numpy as np
 
-from qarts.modeling.factors.context import ContextOps, ContextSrc
+from qarts.modeling.factors.ops import ContextOps
+from qarts.modeling.factors.context import ContextSrc
 from qarts.modeling.factors.base import register_factor, Factor, FactorFromDailyAndIntraday
 
 

@@ -8,7 +8,8 @@ from loguru import logger
 from qarts.core import FactorPanelBlockDense, IntradayPanelBlockDense, DailyPanelBlockIndexed
 from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
 from .base import FactorSpec, get_factor
-from .context import ContextOps, ContextSrc, FactorContext
+from .context import ContextSrc, FactorContext
+from .ops import ContextOps
 
 
 class PipelineFactory:

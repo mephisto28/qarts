@@ -4,7 +4,8 @@ import typing as T
 from dataclasses import dataclass, field
 
 import numpy as np
-from qarts.modeling.factors.context import FactorContext, ContextSrc
+from qarts.modeling.factors.ops import ContextOps
+from qarts.modeling.factors.context import ContextSrc
 
 
 @dataclass
@@ -35,7 +36,7 @@ class Factor(metaclass=abc.ABCMeta):
         return self.params.get('name', self.__class__.__name__)
 
     @abc.abstractmethod
-    def compute_from_context(self, context: FactorContext, out: np.ndarray):
+    def compute_from_context(self, context: ContextOps, out: np.ndarray):
         raise NotImplementedError
 
     @property
