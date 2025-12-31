@@ -142,12 +142,15 @@ class PanelBlockDense:
 
     def get_current_view(self, field: T.Optional[str] = None, window: int = 1) -> np.ndarray:
         block = self.get_view(field)
+        if self.cursor < 0:
+            return block
+
         if window == 1:
             return block[:, self.cursor]
         else:
             start_idx = max(0, self.cursor - window + 1)
             end_idx = min(self.cursor + 1, block.shape[2])
-            return block[:, :, start_idx:end_idx]
+            return block[:, start_idx:end_idx]
 
     def get_copy(self, fields: T.Optional[list[str]] = None) -> 'PanelBlockDense':
         if fields is None:
@@ -194,7 +197,7 @@ class PanelBlockDense:
         inst_cats: np.ndarray = None,
         is_intraday: bool = False
     ) -> 'PanelBlockDense':
-
+        block.ensure_order('instrument-first')
         if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
             trading_date = block.datetimes[0].date()
             timestamps = make_time_grid(trading_date, frequency=frequency)

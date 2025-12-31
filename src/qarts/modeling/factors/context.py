@@ -67,7 +67,6 @@ class FactorContext:
     def from_daily_block(cls, daily_block: PanelBlockDense | PanelBlockIndexed) -> 'FactorContext':
         if isinstance(daily_block, PanelBlockIndexed):
             columns = list(daily_block.data.columns)
-            daily_block.ensure_order('instrument-first')
             daily_block = PanelBlockDense.from_indexed_block(
                 daily_block,
                 required_columns=columns,
@@ -119,22 +118,21 @@ class ContextOps:
         self.context = context
         self.is_online = is_online # 
     
-    @expand_tdim_on_batch
     def now(self, field: str, window: int = 1) -> np.ndarray:
         assert ContextSrc.INTRADAY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.INTRADAY_QUOTATION]
         return block.get_current_view(field, window)
     
     @expand_tdim_on_batch
-    def yesterday(self, field: str, window: int = 1) -> np.ndarray:
+    def yesterday(self, field: str) -> np.ndarray:
         assert ContextSrc.DAILY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.DAILY_QUOTATION]
-        return block.get_current_view(field, window)
+        return block.get_view(field)[:, -1]
 
     @query_or_set_history_cache
     def _history_prefix_sum(self, field: str, name: str = 'history_prefix_sum') -> np.ndarray:
         values = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=field)
-        return np.cumsum(values, axis=1)
+        return np.nancumsum(values, axis=1)
 
     @query_or_set_history_cache
     def _history_weighted_prefix_sum(self, fields: T.Tuple[str, ...], name: str = 'history_weighted_prefix_sum') -> np.ndarray:

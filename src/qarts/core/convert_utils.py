@@ -23,10 +23,14 @@ def build_ranges(ids_sorted: np.ndarray, n_inst: int):
         x = int(ids_sorted[k])
         if x != cur:
             end[cur] = k
+            cur = x
+            if x == -1:
+                continue
             if start[x] == -1:
                 start[x] = k
-            cur = x
-    end[cur] = ids_sorted.size
+
+    if end[cur] == -1:
+        end[cur] = ids_sorted.size
     return start, end
 
 
