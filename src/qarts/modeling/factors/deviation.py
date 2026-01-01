@@ -26,7 +26,8 @@ class MAPriceDeviation(Factor):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         ma = ops.history_ma(self.history_price_field, window=self.window)
         current_price = ops.now(self.price_field)
-        out[:] = np.log(current_price) - np.log(ma)
+        np.log(current_price, out=out)
+        out -= np.log(ma)
 
 
 @register_factor('price_dev_from_vwap')
@@ -46,7 +47,8 @@ class VWAPPriceDeviation(Factor):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         vwap = ops.hisotry_vwap((self.history_price_field, self.history_volume_field), self.window)
         current_price = ops.now(self.current_price_field)
-        out[:] = np.log(current_price) - np.log(vwap)
+        np.log(current_price, out=out)
+        out -= np.log(vwap)
 
 
 @register_factor('price_dev_from_yest_vwap')
@@ -66,7 +68,8 @@ class YestVWAPPriceDeviation(Factor):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         vwap = ops.yesterday(self.yesterday_price_field)
         current_price = ops.now(self.current_price_field)
-        out[:] = np.log(current_price) - np.log(vwap)
+        np.log(current_price, out=out)
+        out -= np.log(vwap)
 
 
 @register_factor('price_position')
@@ -87,4 +90,5 @@ class PricePosition(FactorFromDailyAndIntraday):
         price = ops.now(self.price_field)
         history_high = ops.history_high(self.high_field, window=self.window)
         history_low = ops.history_low(self.low_field, window=self.window)
-        out[:] = (price - history_low) / (history_high - history_low)
+        out[:] = price - history_low
+        out /= (history_high - history_low)

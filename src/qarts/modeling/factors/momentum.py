@@ -22,7 +22,8 @@ class DailyMomentum(FactorFromDailyAndIntraday):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         history_values = ops.history_lag(self.history_price_field, window=self.window)
         current_price = ops.now(self.price_field)
-        out[:] = np.log(current_price) - np.log(history_values)
+        np.log(current_price, out=out)
+        out -= np.log(history_values)
 
 
 @register_factor('intraday_mom')
@@ -41,4 +42,5 @@ class IntradayMomentum(FactorFromDailyAndIntraday):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         open_price = ops.today_open(self.price_field)
         current_price = ops.now(self.price_field)
-        out[:] = np.log(current_price) - np.log(open_price)
+        np.log(current_price, out=out)
+        out -= np.log(open_price)

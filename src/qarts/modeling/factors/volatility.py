@@ -23,5 +23,7 @@ class DailyVolatility(FactorFromDailyAndIntraday):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         today_ret = ops.now_factor(self.return_field)
         hist_ss, valid_count = ops.history_sq_cumsum_with_count(self.history_return_field, self.window)
-        current_ss = np.square(today_ret)
-        out[:] = np.sqrt((hist_ss + current_ss) / (valid_count + 1))
+        np.square(today_ret, out=out) # inplace op to reduce memory allocation cost
+        out += hist_ss
+        out /= (valid_count + 1)
+        np.sqrt(out, out=out)
