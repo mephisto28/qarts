@@ -55,16 +55,16 @@ class PanelLoader(T.Protocol):
     def save_intraday_prediction(self, block: PanelBlockIndexed, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> None:
         raise NotImplementedError
 
-    def load_intraday_prediction(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> PanelBlockIndexed:
+    def load_intraday_prediction(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         raise NotImplementedError
 
     def save_intraday_factor(self, block: PanelBlockIndexed, factor: str, date: datetime.date | str) -> None:
         raise NotImplementedError
 
-    def load_intraday_factor(self, factor: str, date: datetime.date | str) -> PanelBlockIndexed:
+    def load_intraday_factor(self, factor: str, date: datetime.date | str, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         raise NotImplementedError
 
-    def load_intraday_prediction_with_quotations(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> PanelBlockIndexed:
+    def load_intraday_prediction_with_quotations(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         raise NotImplementedError
 
     def load_daily_quotation(self, start_date: datetime.date | str = None, end_date: datetime.date | str = None, instruments: T.Optional[str] = None, fields: T.Optional[list[str]] = None) -> DailyPanelBlockIndexed:

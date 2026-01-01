@@ -1,2 +1,2 @@
-from .dataloader import PanelLoader
+from .dataloader import PanelLoader, VariableLoadSpec
 from .parquet_loader import ParquetPanelLoader

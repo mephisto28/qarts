@@ -31,6 +31,11 @@ class PanelDataIndexed:
         df = self.data.loc[start_date:end_date].copy()
         return type(self)(df, order='datetime-first')
 
+    def filter_instrument_by_count(self, min_count: int):
+        df = self.data
+        df = df[df.groupby(level='instrument').transform('size') > min_count]
+        return PanelBlockIndexed.from_dataframe(df, order=self.order)
+
     def ensure_order(self, order: str):
         self.order = order
         if order == 'datetime-first':
@@ -195,7 +200,8 @@ class PanelBlockDense:
         fill_methods: list[str],
         frequency: str = '1min', 
         inst_cats: np.ndarray = None,
-        is_intraday: bool = False
+        is_intraday: bool = False,
+        min_nan_count: int = 0
     ) -> 'PanelBlockDense':
         block.ensure_order('instrument-first')
         if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
@@ -214,11 +220,17 @@ class PanelBlockDense:
         n_inst = len(inst_cats)
         starts, ends = build_ranges(inst_code, n_inst)
         values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods)
+        inst_cats = np.array(inst_cats)
+        if min_nan_count > 0:
+            instrument_nan_counts = np.max(np.sum(np.isnan(values), axis=-1), axis=0)
+            intrument_filter = instrument_nan_counts > min_nan_count
+            values = values[:, intrument_filter]
+            inst_cats = inst_cats[intrument_filter]
         
         return PanelBlockDense(
             instruments=np.array(inst_cats),
             timestamps=timestamps,
-            data=values,
+            data=values, # (F, N, T)
             fields=required_columns,
             frequency=frequency
         )

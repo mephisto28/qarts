@@ -100,11 +100,11 @@ class ParquetPanelLoader(PanelLoader):
         path = os.path.join(dir, f'{date_str}.parquet')
         self.save_intraday_to_dst(block, path)
 
-    def load_intraday_prediction(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> PanelBlockIndexed:
+    def load_intraday_prediction(self, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         dir = self.get_dir('prediction', model=model, epoch=epoch, use_ema=use_ema)
         date_str = date.strftime('%Y%m%d') if isinstance(date, datetime.date) else date
         path = os.path.join(dir, f'{date_str}.parquet')
-        return self.load_indexed_block_from_path(path)
+        return self.load_indexed_block_from_path(path, fields=fields)
     
     def save_intraday_prediction(self, block: PanelBlockIndexed, model: str, epoch: int, date: datetime.date | str, use_ema: bool = False) -> None:
         dir = self.get_dir('prediction', model=model, epoch=epoch, use_ema=use_ema)
