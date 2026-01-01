@@ -101,8 +101,20 @@ class IntradayBatchProcessingEngine:
             )
         )
         
-        factor_compute = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
-        factors_block = factor_compute(context)
+        # factor_compute = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
+        # factors_block = factor_compute(context)
+        factors_block = FactorPanelBlockDense.init_empty_from_context(
+            context.inst_categories,
+            timestamps=context.blocks[ContextSrc.INTRADAY_QUOTATION].timestamps,
+            fields=[f.name for f in self.factors],
+            freq=context.blocks[ContextSrc.INTRADAY_QUOTATION].frequency
+        )
+        context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
+        context_ops = ContextOps(context, is_online=False)
+        for i, factor in enumerate(self.factors):
+            placeholder = factors_block.data[i]
+            factor.compute_from_context(context_ops, placeholder)
+        breakpoint()
         return factors_block
 
     def iterate_tasks(self) -> T.Generator[tuple[datetime.date, FactorPanelBlockDense], None, None]:

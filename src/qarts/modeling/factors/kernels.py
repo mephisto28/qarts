@@ -3,7 +3,7 @@ import numpy as np
 
 
 @nb.njit(parallel=True)
-def ffill2d(a, out):
+def ffill2d(a, out, reverse: bool = False):
     """
     Out-of-place forward fill along axis=1 for 2D float array.
     out must be preallocated with same shape as a.
@@ -11,7 +11,11 @@ def ffill2d(a, out):
     n0, n1 = a.shape
     for i in nb.prange(n0):
         last = np.nan
-        for j in range(n1):
+        if reverse:
+            j_range = range(n1 - 1, -1, -1)
+        else:
+            j_range = range(n1)
+        for j in j_range:
             x = a[i, j]
             if x == x:
                 last = x

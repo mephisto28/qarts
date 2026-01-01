@@ -45,7 +45,7 @@ class VWAPPriceDeviation(Factor):
         return f'price_dev_from_vwap_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        vwap = ops.hisotry_vwap((self.history_price_field, self.history_volume_field), self.window)
+        vwap = ops.hisotry_vwap((self.history_price_field, self.history_volume_field), window=self.window)
         current_price = ops.now(self.current_price_field)
         np.log(current_price, out=out)
         out -= np.log(vwap)
@@ -90,5 +90,7 @@ class PricePosition(FactorFromDailyAndIntraday):
         price = ops.now(self.price_field)
         history_high = ops.history_high(self.high_field, window=self.window)
         history_low = ops.history_low(self.low_field, window=self.window)
-        out[:] = price - history_low
-        out /= (history_high - history_low)
+        high = np.maximum(history_high, price)
+        low = np.minimum(history_low, price)
+        out[:] = price - low
+        out /= high - low

@@ -26,8 +26,8 @@ class DailyOps(BaseOps):
 
     @context_cache
     def _history_weighted_prefix_sum(self, fields: T.Tuple[str, ...], name: str = 'history_weighted_prefix_sum') -> np.ndarray:
-        value1 = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=fields[0])
-        value2 = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=fields[1])
+        value1 = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=fields[0]).astype(np.float64)
+        value2 = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=fields[1]).astype(np.float64)
         return np.nancumsum(value1 * value2, axis=1)
 
     @context_cache
@@ -74,7 +74,7 @@ class DailyOps(BaseOps):
         volume_prefix_sum = self._history_prefix_sum(volume_field)
         weighted_sum = weighted_prefix_sum[:, -1] - weighted_prefix_sum[:, -window]
         normalizer = volume_prefix_sum[:, -1] - volume_prefix_sum[:, -window]
-        return weighted_sum / normalizer
+        return (weighted_sum / normalizer).astype(np.float32)
 
     @expand_tdim_on_batch
     def history_high(self, field: str, name: str = 'history_high', window: int = 20) -> np.ndarray:
