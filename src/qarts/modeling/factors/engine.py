@@ -30,6 +30,7 @@ class PipelineFactory:
                 fields=[f.name for f in self.factors],
                 freq=context.blocks[src].frequency
             )
+            context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
             context_ops = ContextOps(context, is_online=False)
             for i, factor in enumerate(self.factors):
                 placeholder = factors_block.data[i]
@@ -72,7 +73,7 @@ class IntradayBatchProcessingEngine:
         save_specs = [VariableLoadSpec(var_type='factor', load_kwargs={'factor': f.name}) for f in self.factors]
         available_dates = self.loader.list_available_dates([load_spec])
         existing_dates = self.loader.list_available_dates(save_specs)
-        required_dates = set(available_dates) - set(existing_dates)
+        required_dates = sorted(set(available_dates) - set(existing_dates))
 
         for date in required_dates:
             yield datetime.datetime.combine(date, datetime.time(0, 0, 0))

@@ -111,11 +111,3 @@ class DailyOps(BaseOps):
         hist_ss = hist_rsq_cumsum[:, -1] - hist_rsq_cumsum[:, -window]
         valid_count = hist_count_cumsum[:, -1] - hist_count_cumsum[:, -window]
         return hist_ss, valid_count
-
-    def realised_volatility(self, history_field: str, intraday_field: str, window: int = 20) -> np.ndarray:
-        today_ret = self.now(intraday_field)
-        hist_ss, valid_count = self.history_sq_cumsum_with_count(history_field, window)
-        current_ss = np.square(today_ret)
-        total_ss = hist_ss + current_ss
-        realised_var = total_ss / (valid_count + 1)
-        return np.sqrt(realised_var)

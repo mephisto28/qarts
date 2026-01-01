@@ -14,6 +14,7 @@ class FactorSpec:
     input_fields: dict[str, list[str]]
     window: int = 1
     params: dict = field(default_factory=dict)
+    need_cache: bool = False
 
 
 class Factor(metaclass=abc.ABCMeta):
@@ -46,8 +47,9 @@ class Factor(metaclass=abc.ABCMeta):
 
 class FactorFromDailyAndIntraday(Factor):
 
-    num_daily_fields: int = -1
-    num_intraday_fields: int = -1
+    num_daily_fields: int = 0
+    num_intraday_fields: int = 0
+    num_factor_cache_fields: int = 0
 
     def _check_inputs_valid(self):
         if self.num_daily_fields > 0:
@@ -61,6 +63,12 @@ class FactorFromDailyAndIntraday(Factor):
         else:
             if ContextSrc.INTRADAY_QUOTATION in self.input_fields:
                 assert len(self.input_fields[ContextSrc.INTRADAY_QUOTATION]) == 0
+        
+        if self.num_factor_cache_fields > 0:
+            assert len(self.input_fields[ContextSrc.FACTOR_CACHE]) == self.num_factor_cache_fields
+        else:
+            if ContextSrc.FACTOR_CACHE in self.input_fields:
+                assert len(self.input_fields[ContextSrc.FACTOR_CACHE]) == 0
 
 
 _factors_registry: T.Dict[str, type['Factor']] = {}
@@ -84,5 +92,5 @@ def _(factor_name: str, input_fields: dict[str, list[str]], window: int = 1, **k
 
 @get_factor.register
 def _(spec: FactorSpec) -> Factor:
-    return get_factor(spec.name, input_fields=spec.input_fields, window=spec.window, **spec.params)
+    return get_factor(spec.name, input_fields=spec.input_fields, window=spec.window, need_cache=spec.need_cache, **spec.params)
 

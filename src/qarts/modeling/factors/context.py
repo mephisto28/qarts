@@ -23,11 +23,10 @@ class FactorContext:
     inst_categories: np.ndarray
     blocks: T.Dict[str, PanelBlockDense] = field(default_factory=dict)
     intermediate_cache: T.Dict[str, np.ndarray] = field(default_factory=dict)
-    factor_cache: T.Dict[str, np.ndarray] = field(default_factory=dict)
     current_cursor: int = -1
 
     def register_block(self, src: ContextSrc, block: PanelBlockDense):
-        assert src in (ContextSrc.DAILY_QUOTATION, ContextSrc.INTRADAY_QUOTATION), f"Invalid source: {src}"
+        assert src in (ContextSrc.DAILY_QUOTATION, ContextSrc.INTRADAY_QUOTATION, ContextSrc.FACTOR_CACHE), f"Invalid source: {src}"
         self.blocks[src] = block
 
     def register_cache(self, key, shape, dtype=np.float32, scope=None):
@@ -54,11 +53,12 @@ class FactorContext:
             scope_, buffer = self.intermediate_cache[key]
             if scope != scope_:
                 logger.error(f"Conflict: {key} is already registered by {scope_}, cannot set cache by {scope}")
+            buffer[:] = value
+        else:
+            buffer = value
         self.intermediate_cache[key] = (scope, value)
 
     def get_field(self, src: ContextSrc, field: str) -> np.ndarray:
-        if src == ContextSrc.FACTOR_CACHE:
-            return self.factor_cache[field]
         if not src in self.blocks:
             raise ValueError(f"Invalid source: {src}, available sources: {list(self.blocks.keys())}")
         block = self.blocks[src]
