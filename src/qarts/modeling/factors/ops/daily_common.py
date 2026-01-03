@@ -31,7 +31,7 @@ class DailyOps(BaseOps):
             pow_data = data.copy()
         else:
             pow_data = np.power(data, power)
-        return kns.reverse_cumsum_2d(pow_data, pow_data)
+        return kns.reverse_cumsum_2d(a=pow_data, out=pow_data)
 
     @context_static_cache
     def history_prod_cumsum(self, field: T.Tuple[str, ...], input_value: T.Optional[np.ndarray] = None, name: str = 'history_prod_cumsum') -> np.ndarray:
@@ -45,7 +45,7 @@ class DailyOps(BaseOps):
         out = values[0].astype(np.float64, copy=True)
         for value in values[1:]:
             out *= value
-        return kns.reverse_cumsum_2d(out, out)
+        return kns.reverse_cumsum_2d(a=out, out=out)
 
     @context_static_cache
     def history_suffix_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_suffix_high') -> np.ndarray:
