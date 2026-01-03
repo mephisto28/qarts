@@ -78,12 +78,23 @@ class IntradayBatchProcessingEngine:
         for date in required_dates:
             yield datetime.datetime.combine(date, datetime.time(0, 0, 0))
 
-    def process_date(self, date: datetime.datetime) -> FactorPanelBlockDense:
-        logger.info(f"Processing date: {date}")
-        start_date = date - datetime.timedelta(days=365)
-        yesterday = date - datetime.timedelta(days=1)
-        daily_block = self.daily_block.between(start_date=start_date, end_date=yesterday)
+    def process_targets(self, date: datetime.datetime) -> FactorPanelBlockDense:
+        logger.info(f"Processing targets for date: {date}")
+        start_date = date
+        end_date = date + datetime.timedelta(days=21)
+        daily_block = self.daily_block.between(start_date=start_date, end_date=end_date)
         daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
+        daily_block.ensure_order('instrument-first')
+        context = FactorContext.from_daily_block(daily_block)
+        context
+    
+    def process_factor(self, date: datetime.datetime) -> FactorPanelBlockDense:
+        logger.info(f"Processing date: {date}")
+        start_date = date - datetime.timedelta(days=300) # 200
+        yesterday = date - datetime.timedelta(days=1)
+        daily_block = self.daily_block.between(start_date=start_date, end_date=date)
+        daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
+        daily_block = self.daily_block.between(start_date=start_date, end_date=yesterday)
         daily_block.ensure_order('instrument-first')
         context = FactorContext.from_daily_block(daily_block)
 

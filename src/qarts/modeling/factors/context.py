@@ -16,6 +16,8 @@ class ContextSrc(Enum):
     DAILY_QUOTATION = auto()
     FACTOR_CACHE = auto()
 
+    FUTURE_DAILY_QUOTATION = auto() # for targets label / IC test
+
 
 @dataclass
 class FactorContext:

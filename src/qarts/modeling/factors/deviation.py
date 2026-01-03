@@ -4,12 +4,13 @@ import typing as T
 
 import numpy as np
 
-from qarts.modeling.factors.ops import ContextOps
-from qarts.modeling.factors.context import ContextSrc
-from qarts.modeling.factors.base import register_factor, Factor, FactorFromDailyAndIntraday
+from .ops import ContextOps
+from .context import ContextSrc
+from .constants import FactorNames
+from .base import register_factor, Factor, FactorFromDailyAndIntraday
 
 
-@register_factor('price_dev_from_ma')
+@register_factor(FactorNames.PRICE_DEV_FROM_MA)
 class MAPriceDeviation(Factor):
     num_daily_fields = 1
     num_intraday_fields = 1
@@ -21,7 +22,7 @@ class MAPriceDeviation(Factor):
 
     @property
     def name(self) -> str:
-        return f'price_dev_from_ma_{self.window}'
+        return f'{FactorNames.PRICE_DEV_FROM_MA}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         ma = ops.history_ma(self.history_price_field, window=self.window)
@@ -30,7 +31,7 @@ class MAPriceDeviation(Factor):
         out -= np.log(ma)
 
 
-@register_factor('price_dev_from_vwap')
+@register_factor(FactorNames.PRICE_DEV_FROM_VWAP)
 class VWAPPriceDeviation(Factor):
     num_daily_fields = 2
     num_intraday_fields = 1
@@ -42,7 +43,7 @@ class VWAPPriceDeviation(Factor):
 
     @property
     def name(self) -> str:
-        return f'price_dev_from_vwap_{self.window}'
+        return f'{FactorNames.PRICE_DEV_FROM_VWAP}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         vwap = ops.hisotry_vwap((self.history_price_field, self.history_volume_field), window=self.window)
@@ -51,7 +52,7 @@ class VWAPPriceDeviation(Factor):
         out -= np.log(vwap)
 
 
-@register_factor('price_dev_from_yest_vwap')
+@register_factor(FactorNames.PRICE_DEV_FROM_YEST_VWAP)
 class YestVWAPPriceDeviation(Factor):
     num_daily_fields = 1
     num_intraday_fields = 1
@@ -63,7 +64,7 @@ class YestVWAPPriceDeviation(Factor):
 
     @property
     def name(self) -> str:
-        return 'price_dev_from_yest_vwap'
+        return FactorNames.PRICE_DEV_FROM_YEST_VWAP
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         vwap = ops.yesterday(self.yesterday_price_field)
@@ -72,7 +73,7 @@ class YestVWAPPriceDeviation(Factor):
         out -= np.log(vwap)
 
 
-@register_factor('price_position')
+@register_factor(FactorNames.PRICE_POSITION)
 class PricePosition(FactorFromDailyAndIntraday):
     num_daily_fields = 2
     num_intraday_fields = 1
@@ -84,7 +85,7 @@ class PricePosition(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        return f'price_position_{self.window}'
+        return f'{FactorNames.PRICE_POSITION}_{self.window}'
     
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         price = ops.now(self.price_field)

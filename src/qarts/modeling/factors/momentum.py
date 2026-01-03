@@ -1,11 +1,12 @@
 import numpy as np
 
-from qarts.modeling.factors.ops import ContextOps
-from qarts.modeling.factors.context import ContextSrc
-from qarts.modeling.factors.base import register_factor, FactorFromDailyAndIntraday
+from .ops import ContextOps
+from .context import ContextSrc
+from .base import register_factor, FactorFromDailyAndIntraday
+from .constants import FactorNames
 
 
-@register_factor('daily_mom')
+@register_factor(FactorNames.DAILY_MOM)
 class DailyMomentum(FactorFromDailyAndIntraday):
     num_daily_fields = 1
     num_intraday_fields = 1
@@ -17,7 +18,7 @@ class DailyMomentum(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        return f'daily_mom_{self.window}'
+        return f'{FactorNames.DAILY_MOM}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         history_values = ops.history_lag(self.history_price_field, window=self.window)
@@ -26,7 +27,7 @@ class DailyMomentum(FactorFromDailyAndIntraday):
         out -= np.log(history_values)
 
 
-@register_factor('intraday_mom')
+@register_factor(FactorNames.INTRADAY_MOM)
 class IntradayMomentum(FactorFromDailyAndIntraday):
     num_daily_fields = 0
     num_intraday_fields = 1
@@ -37,7 +38,7 @@ class IntradayMomentum(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        return f'intraday_mom_{self.window}'
+        return f'{FactorNames.INTRADAY_MOM}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         open_price = ops.today_open(self.price_field)
