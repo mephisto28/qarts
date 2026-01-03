@@ -94,7 +94,7 @@ class IntradayBatchProcessingEngine:
         yesterday = date - datetime.timedelta(days=1)
         daily_block = self.daily_block.between(start_date=start_date, end_date=date)
         daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
-        daily_block = self.daily_block.between(start_date=start_date, end_date=yesterday)
+        daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
         daily_block.ensure_order('instrument-first')
         context = FactorContext.from_daily_block(daily_block)
 
@@ -130,5 +130,5 @@ class IntradayBatchProcessingEngine:
 
     def iterate_tasks(self) -> T.Generator[tuple[datetime.date, FactorPanelBlockDense], None, None]:
         for date in self.generate_date_tasks():
-            yield date, self.process_date(date)
+            yield date, self.process_factor(date)
         

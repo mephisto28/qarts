@@ -34,11 +34,11 @@ class DailyOps(BaseOps):
         return np.nancumsum(pow_data, axis=1)
 
     @context_static_cache
-    def _history_prod_cumsum(self, fields: T.Tuple[str, ...], input_value: T.Optional[np.ndarray] = None, name: str = 'history_prod_cumsum') -> np.ndarray:
+    def _history_prod_cumsum(self, field: T.Tuple[str, ...], input_value: T.Optional[np.ndarray] = None, name: str = 'history_prod_cumsum') -> np.ndarray:
         if input_value is None:
             values = [
-                self.context.get_field(ContextSrc.DAILY_QUOTATION, field=field) 
-                for field in fields
+                self.context.get_field(ContextSrc.DAILY_QUOTATION, field=f) 
+                for f in field
             ]
         else:
             values = input_value
@@ -78,7 +78,7 @@ class DailyOps(BaseOps):
     @expand_tdim
     def history_ma(self, field: str, name: str = 'history_ma', window: int = 20) -> np.ndarray:
         prefix_sum = self._history_pow_cumsum(field, power=1)
-        prefix_count = self._history_prefix_count(field)
+        prefix_count = self._history_pow_cumsum(field, power=0)
         ma = (prefix_sum[:, -1] - prefix_sum[:, -window]) / (prefix_count[:, -1] - prefix_count[:, -window])
         return ma
     

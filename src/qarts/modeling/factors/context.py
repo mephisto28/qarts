@@ -81,3 +81,38 @@ class FactorContext:
             inst_categories=daily_block.instruments,
             blocks={ContextSrc.DAILY_QUOTATION: daily_block}
         )
+
+
+def create_mock_context(size=10, seed=42):
+    from qarts.utils.random_walk import simulate_random_walk, simulate_noisy_random_walk
+    instruments = [f'mk{i:06}' for i in range(size)]
+    dates = np.arange(252)
+    minutes = np.arange(240)
+
+    daily_prices = close = simulate_random_walk(s0=100, mu=0.00, sigma=0.02, n_steps=252, n_paths=size, seed=seed)
+    open = daily_prices * (1 + np.random.uniform(-0.01, 0.01, size=(size, 252)))
+    high = daily_prices * (1 + np.random.uniform(0, 0.03, size=(size, 252)))
+    low = daily_prices * (1 - np.random.uniform(0, 0.03, size=(size, 252)))
+    volume = np.exp(np.random.normal(loc=12, scale=1, size=(size, 252)))
+    daily_return = np.concatenate([np.zeros((size, 1)), np.log(daily_prices[1:] / daily_prices[:-1])], axis=1)
+    block_data = np.stack([open, high, low, close, volume, daily_return], axis=0)
+    fields = ['adjusted_open', 'adjusted_high', 'adjusted_low', 'adjusted_close', 'volume', 'daily_return']
+
+    intraday_prices = simulate_noisy_random_walk(s0=daily_prices[:, -1], mu=0.00, sigma=0.001, n_steps=240, n_paths=size, seed=seed)
+    daily_block = PanelBlockDense(
+        instruments=instruments,
+        timestamps=dates,
+        data=block_data,
+        fields=fields,
+        frequency='1D'
+    )
+    intraday_block = PanelBlockDense(
+        instruments=instruments,
+        timestamps=minutes,
+        data=intraday_prices,
+        fields=['mid_price'],
+        frequency='1min'
+    )
+    context = FactorContext.from_daily_block(daily_block)
+    context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
+    return context

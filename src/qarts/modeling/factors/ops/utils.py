@@ -21,7 +21,7 @@ def context_static_cache(func):
         if key in self.context.intermediate_cache:
             return self.context.get_cache(key)
         else:
-            values = func(self, field, name, **kwargs)
+            values = func(self, field, input_value, name, **kwargs)
             cache = self.context.get_cache(key, shape=values.shape, dtype=np.float32, scope=None)
             cache[:] = values
             return values
