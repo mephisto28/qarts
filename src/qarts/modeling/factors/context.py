@@ -101,7 +101,7 @@ def create_mock_context(size=10, seed=42):
     intraday_len = 240
     minutes = np.arange(intraday_len + 1)
     intraday_prices = simulate_noisy_random_walk(s0=daily_prices[:, -1], mu=0.00, sigma=0.001, n_steps=intraday_len, n_paths=size, seed=seed)
-    intraday_mom = intraday_prices - intraday_prices[:, 0:1]
+    intraday_mom = np.log(intraday_prices / intraday_prices[:, 0:1])
     daily_block = PanelBlockDense(
         instruments=instruments,
         timestamps=dates,
