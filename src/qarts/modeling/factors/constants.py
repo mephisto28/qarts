@@ -9,5 +9,6 @@ class FactorNames:
     DAILY_MOM = 'daily_mom'
     DAILY_VOLATILITY = 'daily_volatility'
     DAILY_SKEWNESS = 'daily_skewness'
+    DAILY_KURTOSIS = 'daily_kurtosis'
 
     INTRADAY_MOM = 'intraday_mom'
