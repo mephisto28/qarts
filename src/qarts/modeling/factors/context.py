@@ -85,20 +85,23 @@ class FactorContext:
 
 def create_mock_context(size=10, seed=42):
     from qarts.utils.random_walk import simulate_random_walk, simulate_noisy_random_walk
-    instruments = [f'mk{i:06}' for i in range(size)]
-    dates = np.arange(252)
-    minutes = np.arange(240)
+    instruments = np.array([f'mk{i:06}' for i in range(size)])
+    daily_len = 252
+    dates = np.arange(daily_len + 1)
 
-    daily_prices = close = simulate_random_walk(s0=100, mu=0.00, sigma=0.02, n_steps=252, n_paths=size, seed=seed)
-    open = daily_prices * (1 + np.random.uniform(-0.01, 0.01, size=(size, 252)))
-    high = daily_prices * (1 + np.random.uniform(0, 0.03, size=(size, 252)))
-    low = daily_prices * (1 - np.random.uniform(0, 0.03, size=(size, 252)))
-    volume = np.exp(np.random.normal(loc=12, scale=1, size=(size, 252)))
-    daily_return = np.concatenate([np.zeros((size, 1)), np.log(daily_prices[1:] / daily_prices[:-1])], axis=1)
+    daily_prices = close = simulate_random_walk(s0=100, mu=0.00, sigma=0.02, n_steps=daily_len, n_paths=size, seed=seed)
+    open = daily_prices * (1 + np.random.uniform(-0.01, 0.01, size=(size, daily_len + 1)))
+    high = daily_prices * (1 + np.random.uniform(0, 0.03, size=(size, daily_len + 1)))
+    low = daily_prices * (1 - np.random.uniform(0, 0.03, size=(size, daily_len + 1)))
+    volume = np.exp(np.random.normal(loc=12, scale=1, size=(size, daily_len + 1)))
+    daily_return = np.concatenate([np.zeros((size, 1)), np.log(daily_prices[:, 1:] / daily_prices[:, :-1])], axis=1)
     block_data = np.stack([open, high, low, close, volume, daily_return], axis=0)
     fields = ['adjusted_open', 'adjusted_high', 'adjusted_low', 'adjusted_close', 'volume', 'daily_return']
-
-    intraday_prices = simulate_noisy_random_walk(s0=daily_prices[:, -1], mu=0.00, sigma=0.001, n_steps=240, n_paths=size, seed=seed)
+    
+    intraday_len = 240
+    minutes = np.arange(intraday_len + 1)
+    intraday_prices = simulate_noisy_random_walk(s0=daily_prices[:, -1], mu=0.00, sigma=0.001, n_steps=intraday_len, n_paths=size, seed=seed)
+    intraday_mom = intraday_prices - intraday_prices[:, 0:1]
     daily_block = PanelBlockDense(
         instruments=instruments,
         timestamps=dates,
@@ -109,10 +112,19 @@ def create_mock_context(size=10, seed=42):
     intraday_block = PanelBlockDense(
         instruments=instruments,
         timestamps=minutes,
-        data=intraday_prices,
-        fields=['mid_price'],
+        data=np.stack([intraday_prices], axis=0),
+        fields=['mid_price', ],
         frequency='1min'
     )
+    factor_cache_block = PanelBlockDense(
+        instruments=instruments,
+        timestamps=minutes,
+        data=np.stack([intraday_mom], axis=0),
+        fields=['intraday_mom'],
+        frequency='1min'
+    )
+
     context = FactorContext.from_daily_block(daily_block)
     context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
+    context.register_block(ContextSrc.FACTOR_CACHE, factor_cache_block)
     return context

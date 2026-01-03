@@ -9,12 +9,12 @@ class BaseOps:
         self.context = context
         self.is_online = is_online # 
 
-    def now(self, field: str, window: int = 1) -> np.ndarray:
+    def now(self, field: str, window: int = -1) -> np.ndarray:
         assert ContextSrc.INTRADAY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.INTRADAY_QUOTATION]
         return block.get_current_view(field, window)
 
-    def now_factor(self, field: str, window: int = 1) -> np.ndarray:
+    def now_factor(self, field: str, window: int = -1) -> np.ndarray:
         assert ContextSrc.FACTOR_CACHE in self.context.blocks
         block = self.context.blocks[ContextSrc.FACTOR_CACHE]
         return block.get_current_view(field, window)

@@ -79,7 +79,7 @@ class DailyOps(BaseOps):
     def history_ma(self, field: str, name: str = 'history_ma', window: int = 20) -> np.ndarray:
         prefix_sum = self._history_pow_cumsum(field, power=1)
         prefix_count = self._history_pow_cumsum(field, power=0)
-        ma = (prefix_sum[:, -1] - prefix_sum[:, -window]) / (prefix_count[:, -1] - prefix_count[:, -window])
+        ma = (prefix_sum[:, -1] - prefix_sum[:, -window-1]) / (prefix_count[:, -1] - prefix_count[:, -window-1])
         return ma
     
     @expand_tdim
@@ -93,8 +93,8 @@ class DailyOps(BaseOps):
         price_field, volume_field = fields
         weighted_prefix_sum = self._history_prod_cumsum((price_field, volume_field))
         volume_prefix_sum = self._history_pow_cumsum(volume_field, power=1)
-        weighted_sum = weighted_prefix_sum[:, -1] - weighted_prefix_sum[:, -window]
-        normalizer = volume_prefix_sum[:, -1] - volume_prefix_sum[:, -window]
+        weighted_sum = weighted_prefix_sum[:, -1] - weighted_prefix_sum[:, -window-1]
+        normalizer = volume_prefix_sum[:, -1] - volume_prefix_sum[:, -window-1]
         return (weighted_sum / normalizer).astype(np.float32)
 
     @expand_tdim
