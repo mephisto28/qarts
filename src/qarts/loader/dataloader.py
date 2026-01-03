@@ -98,6 +98,13 @@ class PanelLoader(T.Protocol):
         return PanelBlockIndexed(df)
 
 
+@T.runtime_checkable
+class FactorContextLoader(T.Protocol):
 
+    def __init__(self, panel_loader: PanelLoader) -> None:
+        self.panel_loader = panel_loader
+
+    def load_daily_context(self, date: datetime.date | str | None = None):
+        daily_block = self.panel_loader.load_daily_quotation(date=date)
 
 

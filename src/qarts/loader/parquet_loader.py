@@ -70,7 +70,7 @@ class ParquetPanelLoader(PanelLoader):
         if not os.path.exists(dir):
             logger.info(f"Creating directory {dir} for saving block to {dst} ...")
             os.makedirs(dir, exist_ok=True)
-        block.data.to_parquet(dst)
+        block.data.to_parquet(dst, compression='zstd')
 
     def load_indexed_block_from_path(self, path: str, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         df = pd.read_parquet(path, columns=fields)

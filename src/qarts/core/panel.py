@@ -258,6 +258,16 @@ class DailyPanelBlockIndexed(PanelBlockIndexed):
             if new_field not in self.fields:
                 self.fields.append(new_field)
 
+    def adjust_field_by_first(self, fields: str):
+        daily_df = self.data
+        first_factor = daily_df.groupby(level='instrument', sort=False)['factor'].transform('first')
+        factor = daily_df['factor']
+        for field in fields:
+            new_field = 'adjusted_' + field
+            daily_df[new_field] = daily_df[field] / factor * first_factor
+            if new_field not in self.fields:
+                self.fields.append(new_field)
+
 @dataclass
 class IntradayPanelBlockDense(PanelBlockDense):
     pass
