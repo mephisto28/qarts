@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-import re
 import typing as T
 
 import numpy as np
@@ -25,7 +23,7 @@ class MAPriceDeviation(Factor):
         return f'{FactorNames.PRICE_DEV_FROM_MA}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        ma = ops.history_ma(self.history_price_field, window=self.window)
+        ma = ops.history_window_ma(self.history_price_field, window=self.window)
         current_price = ops.now(self.price_field)
         np.log(current_price, out=out)
         out -= np.log(ma)
@@ -46,7 +44,7 @@ class VWAPPriceDeviation(Factor):
         return f'{FactorNames.PRICE_DEV_FROM_VWAP}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        vwap = ops.hisotry_vwap((self.history_price_field, self.history_volume_field), window=self.window)
+        vwap = ops.hisotry_window_vwap((self.history_price_field, self.history_volume_field), window=self.window)
         current_price = ops.now(self.current_price_field)
         np.log(current_price, out=out)
         out -= np.log(vwap)
@@ -89,8 +87,8 @@ class PricePosition(FactorFromDailyAndIntraday):
     
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         price = ops.now(self.price_field)
-        history_high = ops.history_high(self.high_field, window=self.window)
-        history_low = ops.history_low(self.low_field, window=self.window)
+        history_high = ops.history_window_high(self.high_field, window=self.window)
+        history_low = ops.history_window_low(self.low_field, window=self.window)
         high = np.maximum(history_high, price)
         low = np.minimum(history_low, price)
         out[:] = price - low

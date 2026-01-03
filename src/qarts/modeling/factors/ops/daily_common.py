@@ -20,7 +20,7 @@ class DailyOps(BaseOps):
         return block.get_view(field)[:, -1]
 
     @context_static_cache
-    def _history_pow_cumsum(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_pow_cumsum', power: int = 1) -> np.ndarray:
+    def history_pow_cumsum(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_pow_cumsum', power: int = 1) -> np.ndarray:
         if input_value is None:
             data = self.context.get_field(ContextSrc.DAILY_QUOTATION, field=field)
         else:
@@ -28,13 +28,13 @@ class DailyOps(BaseOps):
         if power == 0:
             pow_data = (~np.isnan(data)).astype(np.float32)
         elif power == 1:
-            pow_data = data
+            pow_data = data.copy()
         else:
             pow_data = np.power(data, power)
-        return np.nancumsum(pow_data, axis=1)
+        return kns.reverse_cumsum_2d(pow_data, pow_data)
 
     @context_static_cache
-    def _history_prod_cumsum(self, field: T.Tuple[str, ...], input_value: T.Optional[np.ndarray] = None, name: str = 'history_prod_cumsum') -> np.ndarray:
+    def history_prod_cumsum(self, field: T.Tuple[str, ...], input_value: T.Optional[np.ndarray] = None, name: str = 'history_prod_cumsum') -> np.ndarray:
         if input_value is None:
             values = [
                 self.context.get_field(ContextSrc.DAILY_QUOTATION, field=f) 
@@ -45,10 +45,10 @@ class DailyOps(BaseOps):
         out = values[0].astype(np.float64, copy=True)
         for value in values[1:]:
             out *= value
-        return np.nancumsum(out, axis=1).astype(np.float32)
+        return kns.reverse_cumsum_2d(out, out)
 
     @context_static_cache
-    def _history_suffix_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_suffix_high') -> np.ndarray:
+    def history_suffix_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_suffix_high') -> np.ndarray:
         if input_value is None:
             values = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=field) # N, T
         else:
@@ -57,7 +57,7 @@ class DailyOps(BaseOps):
         return np.fmax.accumulate(rev, axis=-1)[::-1]
 
     @context_static_cache
-    def _history_suffix_low(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_suffix_low') -> np.ndarray:
+    def history_suffix_low(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_suffix_low') -> np.ndarray:
         if input_value is None:
             values = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=field) # N, T
         else:
@@ -66,7 +66,7 @@ class DailyOps(BaseOps):
         return np.fmin.accumulate(rev, axis=-1)[::-1]
 
     @context_static_cache
-    def _history_recent_value_wo_nan(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_values_ffilled') -> np.ndarray:
+    def history_recent_value_wo_nan(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_values_ffilled') -> np.ndarray:
         if input_value is None:
             values = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=field) # N, T
         else:
@@ -75,41 +75,55 @@ class DailyOps(BaseOps):
         kns.ffill2d(values, out)
         return out
 
+    @context_static_cache
+    def history_winsorized_value(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'history_winsorized_value', window: int = 126) -> np.ndarray:
+        if input_value is None:
+            values = self.context.get_field(src=ContextSrc.DAILY_QUOTATION, field=field) # N, T
+        else:
+            values = input_value
+        std = ((values ** 2).mean(axis=1) ** 0.5)[:, np.newaxis]
+        return np.clip(values, -std * 3, std * 3)
+
     @expand_tdim
-    def history_ma(self, field: str, name: str = 'history_ma', window: int = 20) -> np.ndarray:
-        prefix_sum = self._history_pow_cumsum(field, power=1)
-        prefix_count = self._history_pow_cumsum(field, power=0)
-        ma = (prefix_sum[:, -1] - prefix_sum[:, -window-1]) / (prefix_count[:, -1] - prefix_count[:, -window-1])
+    def history_window_pow_sum(self, field: str, power: int, window: int) -> np.ndarray:
+        cumsum = self.history_pow_cumsum(field, power=power)
+        return cumsum[:, -window]
+
+    @expand_tdim
+    def history_window_ma(self, field: str, name: str = 'history_ma', window: int = 20) -> np.ndarray:
+        prefix_sum = self.history_pow_cumsum(field, power=1)
+        prefix_count = self.history_pow_cumsum(field, power=0)
+        ma = prefix_sum[:, -window] / prefix_count[:, -window]
         return ma
     
     @expand_tdim
-    def history_valid_ratio(self, field: str, name: str = 'history_valid_ratio', window: int = 20) -> np.ndarray:
-        prefix_count = self._history_pow_cumsum(field, power=0)
-        valid_ratio = (prefix_count[:, -1] - prefix_count[:, -window]) / window
+    def history_window_valid_ratio(self, field: str, name: str = 'history_valid_ratio', window: int = 20) -> np.ndarray:
+        prefix_count = self.history_pow_cumsum(field, power=0)
+        valid_ratio = prefix_count[:, -window] / window
         return valid_ratio
     
     @expand_tdim
-    def hisotry_vwap(self, fields: T.Tuple[str, ...], name: str = 'history_vwap', window: int = 20) -> np.ndarray:
+    def hisotry_window_vwap(self, fields: T.Tuple[str, ...], name: str = 'history_vwap', window: int = 20) -> np.ndarray:
         price_field, volume_field = fields
-        weighted_prefix_sum = self._history_prod_cumsum((price_field, volume_field))
-        volume_prefix_sum = self._history_pow_cumsum(volume_field, power=1)
-        weighted_sum = weighted_prefix_sum[:, -1] - weighted_prefix_sum[:, -window-1]
-        normalizer = volume_prefix_sum[:, -1] - volume_prefix_sum[:, -window-1]
+        weighted_prefix_sum = self.history_prod_cumsum((price_field, volume_field))
+        volume_prefix_sum = self.history_pow_cumsum(volume_field, power=1)
+        weighted_sum = weighted_prefix_sum[:, -window]
+        normalizer = volume_prefix_sum[:, -window]
         return (weighted_sum / normalizer).astype(np.float32)
 
     @expand_tdim
-    def history_high(self, field: str, name: str = 'history_high', window: int = 20) -> np.ndarray:
-        suffix_high = self._history_suffix_high(field)
+    def history_window_high(self, field: str, name: str = 'history_high', window: int = 20) -> np.ndarray:
+        suffix_high = self.history_suffix_high(field)
         return suffix_high[:, -window]
     
     @expand_tdim
-    def history_low(self, field: str, name: str = 'history_low', window: int = 20) -> np.ndarray:
-        suffix_low = self._history_suffix_low(field)
+    def history_window_low(self, field: str, name: str = 'history_low', window: int = 20) -> np.ndarray:
+        suffix_low = self.history_suffix_low(field)
         return suffix_low[:, -window]
 
     @expand_tdim
     def history_lag(self, field: str, name: str = 'history_lag', window: int = 1) -> np.ndarray:
-        values = self._history_recent_value_wo_nan(field)
+        values = self.history_recent_value_wo_nan(field)
         return values[:, -window]
     
     @expand_tdim
@@ -121,8 +135,8 @@ class DailyOps(BaseOps):
 
     @expand_tdim
     def history_sq_cumsum_with_count(self, field: str, window: int = 20) -> np.ndarray:
-        hist_rsq_cumsum = self._history_pow_cumsum(field, power=2)
-        hist_count_cumsum = self._history_pow_cumsum(field, power=0) # non-nan count
-        hist_ss = hist_rsq_cumsum[:, -1] - hist_rsq_cumsum[:, -window]
-        valid_count = hist_count_cumsum[:, -1] - hist_count_cumsum[:, -window]
+        hist_rsq_cumsum = self.history_pow_cumsum(field, power=2)
+        hist_count_cumsum = self.history_pow_cumsum(field, power=0) # non-nan count
+        hist_ss = hist_rsq_cumsum[:, -window]
+        valid_count = hist_count_cumsum[:, -window]
         return hist_ss, valid_count
