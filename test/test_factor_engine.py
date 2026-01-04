@@ -58,14 +58,18 @@ class TestFactorEngine(unittest.TestCase):
         date = pd.Timestamp(date(2023, 1, 4))
         factors_block = engine.process_factor(date)
         for factor in engine.factors:
-            value = factors_block.get_view(factor.name)
+            value = factors_block.get_view(factor.name, return_valid=True)
             mean = np.nanmean(value)
             std = np.nanstd(value)
             min = np.nanmin(value)
             max = np.nanmax(value)
-            nan_count = np.isnan(value).sum(axis=1)
+            col_nan_count = (np.isnan(value).sum(axis=0) > 0).sum()
+            row_nan_count = (np.isnan(value).sum(axis=1) > 0).sum()
+            total_nan_count = np.isnan(value).sum()
+            total_value = value.size
             factor_name = factor.name + ' ' * (24 - len(factor.name))
-            desc_msgs.append(f'{factor_name} mean={mean:.4f},\tstd={std:.4f},\tmin={min:.4f},\tmax={max:.4f}')
+            desc_msgs.append(f'{factor_name} mean={mean:.4f},\tstd={std:.4f},\tmin={min:.4f},\tmax={max:.4f}\tcol nan={col_nan_count},\trow nan={row_nan_count},\ttotal nan={total_nan_count}/{total_value}')
         msg = 'factor_result:\n' + '\n'.join(desc_msgs)
         logger.info(msg)
+        breakpoint()
 

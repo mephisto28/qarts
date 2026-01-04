@@ -34,7 +34,7 @@ class PanelDataIndexed:
     def filter_instrument_by_count(self, min_count: int):
         df = self.data
         df = df[df.groupby(level='instrument').transform('size') > min_count]
-        return PanelBlockIndexed.from_dataframe(df, order=self.order)
+        return type(self)(df, order=self.order)
 
     def ensure_order(self, order: str):
         self.order = order
@@ -133,17 +133,23 @@ class PanelBlockDense:
     fields: list[str]
     frequency: str
     cursor: int = -1
+    is_valid_instruments: np.ndarray = None
 
     def __post_init__(self):
         assert isinstance(self.instruments, np.ndarray)
         assert isinstance(self.timestamps, np.ndarray)
-        assert isinstance(self.fields, list)        
+        assert isinstance(self.fields, list)
+        if self.is_valid_instruments is None:
+            self.is_valid_instruments = (~np.isnan(self.data[0])).sum(axis=-1) > 0
     
-    def get_view(self, field: T.Optional[str]) -> np.ndarray:
+    def get_view(self, field: T.Optional[str], return_valid: bool = False) -> np.ndarray:
         if field is None:
             return self.data
         field_idx = self.fields.index(field)
-        return self.data[field_idx]
+        data = self.data[field_idx]
+        if return_valid:
+            return data[self.is_valid_instruments]
+        return data
 
     def get_current_view(self, field: T.Optional[str] = None, window: int = 1) -> np.ndarray:
         block = self.get_view(field)
@@ -201,7 +207,7 @@ class PanelBlockDense:
         frequency: str = '1min', 
         inst_cats: np.ndarray = None,
         is_intraday: bool = False,
-        min_nan_count: int = 0
+        max_nan_count: int = 0
     ) -> 'PanelBlockDense':
         block.ensure_order('instrument-first')
         if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
@@ -221,18 +227,21 @@ class PanelBlockDense:
         starts, ends = build_ranges(inst_code, n_inst)
         values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods)
         inst_cats = np.array(inst_cats)
-        if min_nan_count > 0:
+        if max_nan_count > 0:
             instrument_nan_counts = np.max(np.sum(np.isnan(values), axis=-1), axis=0)
-            intrument_filter = instrument_nan_counts > min_nan_count
-            values = values[:, intrument_filter]
-            inst_cats = inst_cats[intrument_filter]
+            intrument_filter = instrument_nan_counts < max_nan_count
+        else:
+            intrument_filter = None
+            # values = values[:, intrument_filter]
+            # inst_cats = inst_cats[intrument_filter]
         
         return PanelBlockDense(
             instruments=np.array(inst_cats),
             timestamps=timestamps,
             data=values, # (F, N, T)
             fields=required_columns,
-            frequency=frequency
+            frequency=frequency,
+            is_valid_instruments=intrument_filter
         )
 
 

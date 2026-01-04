@@ -94,6 +94,7 @@ class IntradayBatchProcessingEngine:
         yesterday = date - datetime.timedelta(days=1)
         daily_block = self.daily_block.between(start_date=start_date, end_date=date)
         daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
+        daily_block = daily_block.filter_instrument_by_count(min_count=180)
         daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
         daily_block.ensure_order('instrument-first')
         context = FactorContext.from_daily_block(daily_block)
@@ -108,7 +109,8 @@ class IntradayBatchProcessingEngine:
                 fill_methods=[1],
                 frequency='1min',
                 inst_cats=context.inst_categories,
-                is_intraday=True
+                is_intraday=True,
+                max_nan_count=100
             )
         )
         
@@ -120,6 +122,7 @@ class IntradayBatchProcessingEngine:
             fields=[f.name for f in self.factors],
             freq=context.blocks[ContextSrc.INTRADAY_QUOTATION].frequency
         )
+        factors_block.is_valid_instruments = context.blocks[ContextSrc.INTRADAY_QUOTATION].is_valid_instruments
         context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
         context_ops = ContextOps(context, is_online=False)
         for i, factor in enumerate(self.factors):
