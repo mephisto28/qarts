@@ -62,6 +62,13 @@ def generate_factor_specs():
             ContextSrc.FACTOR_CACHE: ['daily_mom_1']
         }, window=i, params={'shift': 0.01, 'scale': 200, 'window2': i*3})
         factors.append(spec)
+
+    for i in windows[1:]:
+        spec = FactorSpec(name=FactorNames.DAILY_MOM_SUM, input_fields={
+            ContextSrc.DAILY_QUOTATION: ['alpha'],
+            ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total'],
+        }, window=i, params={'shift': 0.0, 'scale': 50})
+        factors.append(spec)
     return factors
 
 
