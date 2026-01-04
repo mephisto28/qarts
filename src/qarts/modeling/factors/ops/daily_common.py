@@ -133,10 +133,15 @@ class DailyOps(BaseOps):
         field_values = block.get_view(field)
         return field_values[:, 0]
 
-    @expand_tdim
-    def history_sq_cumsum_with_count(self, field: str, window: int = 20) -> np.ndarray:
-        hist_rsq_cumsum = self.history_pow_cumsum(field, power=2)
-        hist_count_cumsum = self.history_pow_cumsum(field, power=0) # non-nan count
-        hist_ss = hist_rsq_cumsum[:, -window]
-        valid_count = hist_count_cumsum[:, -window]
-        return hist_ss, valid_count
+    def history_rolling_moment_sequence(self, field: str, power: int, window: int, 
+                                        input_value: T.Optional[np.ndarray] = None, 
+                                        name: str = 'history_rolling_moment') -> np.ndarray:
+       
+        suffix_sum = self.history_pow_cumsum(field, input_value=input_value, power=power)
+        N, T_daily = suffix_sum.shape
+        out = np.full((N, T_daily), np.nan, dtype=np.float64)
+        s_head = suffix_sum[:, :-window]
+        s_tail = suffix_sum[:, window:]
+        out[:, window-1 : -1] = (s_head - s_tail) / window
+        out[:, -1] = suffix_sum[:, -window] / window
+        return out

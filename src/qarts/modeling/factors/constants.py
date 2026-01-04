@@ -8,6 +8,7 @@ class FactorNames:
     PRICE_POSITION = 'price_position'
     DAILY_MOM = 'daily_mom'
     DAILY_VOLATILITY = 'daily_volatility'
+    DAILY_VOLVOL = 'daily_volvol'
     DAILY_SKEWNESS = 'daily_skewness'
     DAILY_KURTOSIS = 'daily_kurtosis'
 

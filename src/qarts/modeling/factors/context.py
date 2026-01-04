@@ -116,11 +116,13 @@ def create_mock_context(size=10, seed=42):
         fields=['mid_price', ],
         frequency='1min'
     )
+    vacancy = np.zeros((10, len(instruments), len(minutes)), dtype=np.float32)
+    vacancy_fields = ['vacancy_' + str(i) for i in range(10)]
     factor_cache_block = PanelBlockDense(
         instruments=instruments,
         timestamps=minutes,
-        data=np.stack([intraday_mom], axis=0),
-        fields=['intraday_mom'],
+        data=np.concatenate([intraday_mom[None, ...], vacancy], axis=0),
+        fields=['intraday_mom'] + vacancy_fields,
         frequency='1min'
     )
 
