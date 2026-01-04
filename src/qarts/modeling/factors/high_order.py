@@ -6,6 +6,10 @@ from .context import ContextSrc
 from .base import register_factor, FactorFromDailyAndIntraday
 from .constants import FactorNames
 
+__all__ = [
+    'DailySkewness',
+    'DailyKurtosis'
+]
 
 @register_factor(FactorNames.DAILY_SKEWNESS)
 class DailySkewness(FactorFromDailyAndIntraday):

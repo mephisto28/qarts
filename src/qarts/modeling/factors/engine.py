@@ -106,7 +106,7 @@ class IntradayBatchProcessingEngine:
             IntradayPanelBlockDense.from_indexed_block(
                 block, 
                 required_columns=self.intraday_fields, 
-                fill_methods=[1],
+                fill_methods=[1 for _ in self.intraday_fields],
                 frequency='1min',
                 inst_cats=context.inst_categories,
                 is_intraday=True,

@@ -8,6 +8,10 @@ from .constants import FactorNames
 from .base import register_factor, FactorFromDailyAndIntraday
 from . import kernels as kns
 
+__all__ = [
+    'DailyVolatility',
+    'DailyVolVol'
+]
 
 @register_factor(FactorNames.DAILY_VOLATILITY)
 class DailyVolatility(FactorFromDailyAndIntraday):

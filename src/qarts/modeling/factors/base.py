@@ -87,7 +87,7 @@ def get_factor(factor, *args, **kwargs) -> Factor:
 @get_factor.register
 def _(factor_name: str, input_fields: dict[str, list[str]], window: int = 1, **kwargs) -> Factor:
     F = _factors_registry[factor_name]
-    print(f"get_factor: {factor_name}, {input_fields}, {window}, {kwargs}")
+    # print(f"get_factor: {factor_name}, {input_fields}, {window}, {kwargs}")
     return F(input_fields=input_fields, window=window, **kwargs)
 
 @get_factor.register

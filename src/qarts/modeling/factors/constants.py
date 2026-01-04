@@ -7,6 +7,7 @@ class FactorNames:
     PRICE_DEV_FROM_YEST_VWAP = 'price_dev_from_yest_vwap'
     PRICE_POSITION = 'price_position'
     DAILY_MOM = 'daily_mom'
+    DAILY_MOM_SUM = 'daily_mom_sum'
     DAILY_VOLATILITY = 'daily_volatility'
     DAILY_VOLVOL = 'daily_volvol'
     DAILY_SKEWNESS = 'daily_skewness'
