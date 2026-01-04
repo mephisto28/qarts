@@ -125,7 +125,10 @@ class IntradayBatchProcessingEngine:
         for i, factor in enumerate(self.factors):
             placeholder = factors_block.data[i]
             factor.compute_from_context(context_ops, placeholder)
-        breakpoint()
+        for i, factor in enumerate(self.factors):
+            value = factors_block.data[i]
+            value -= factor.shift
+            value *= factor.scale
         return factors_block
 
     def iterate_tasks(self) -> T.Generator[tuple[datetime.date, FactorPanelBlockDense], None, None]:

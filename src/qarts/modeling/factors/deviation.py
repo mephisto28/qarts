@@ -27,6 +27,7 @@ class MAPriceDeviation(Factor):
         current_price = ops.now(self.price_field)
         np.log(current_price, out=out)
         out -= np.log(ma)
+        out /= np.sqrt(self.window)
 
 
 @register_factor(FactorNames.PRICE_DEV_FROM_VWAP)
@@ -48,6 +49,7 @@ class VWAPPriceDeviation(Factor):
         current_price = ops.now(self.current_price_field)
         np.log(current_price, out=out)
         out -= np.log(vwap)
+        out /= np.sqrt(self.window)
 
 
 @register_factor(FactorNames.PRICE_DEV_FROM_YEST_VWAP)

@@ -15,12 +15,12 @@ class TestDeviation(unittest.TestCase):
 
     def naive_vwap_deviation(self, window: int):
         vwap = np.nansum(self.daily_price[:, -window:].astype(np.float64) * self.daily_volume[:, -window:], axis=1) / np.nansum(self.daily_volume[:, -window:], axis=1)
-        out = np.log(self.intraday_price) - np.log(vwap)[:, np.newaxis]
+        out = (np.log(self.intraday_price) - np.log(vwap)[:, np.newaxis]) / np.sqrt(window)
         return out
 
     def naive_ma_deviation(self, window: int):
         ma = np.nanmean(self.daily_price[:, -window:], axis=1)
-        out = np.log(self.intraday_price) - np.log(ma)[:, np.newaxis]
+        out = (np.log(self.intraday_price) - np.log(ma)[:, np.newaxis]) / np.sqrt(window)
         return out
 
     def assert_arr_equal(self, arr1, arr2, eps=1e-3):

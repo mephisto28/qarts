@@ -25,6 +25,7 @@ class DailyMomentum(FactorFromDailyAndIntraday):
         current_price = ops.now(self.price_field)
         np.log(current_price, out=out)
         out -= np.log(history_values)
+        out /= np.sqrt(self.window)
 
 
 @register_factor(FactorNames.INTRADAY_MOM)
@@ -45,3 +46,4 @@ class IntradayMomentum(FactorFromDailyAndIntraday):
         current_price = ops.now(self.price_field)
         np.log(current_price, out=out)
         out -= np.log(open_price)
+        out /= np.sqrt(self.window)
