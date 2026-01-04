@@ -1,9 +1,7 @@
-from curses import window
 import unittest
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from loguru import logger
 from qarts.modeling.factors import FactorNames, FactorSpec, ContextSrc
 from qarts.loader import ParquetPanelLoader
@@ -54,7 +52,7 @@ def generate_factor_specs():
         spec = FactorSpec(name=FactorNames.DAILY_KURTOSIS, input_fields={
             ContextSrc.DAILY_QUOTATION: ['daily_return'],
             ContextSrc.FACTOR_CACHE: ['daily_mom_1']
-        }, window=i, params={'shift': 0.0, 'scale': 1})
+        }, window=i, params={'shift': 0.0, 'scale': 0.5})
         factors.append(spec)
     for i in windows[1:5]:
         spec = FactorSpec(name=FactorNames.DAILY_VOLVOL, input_fields={
@@ -62,12 +60,31 @@ def generate_factor_specs():
             ContextSrc.FACTOR_CACHE: ['daily_mom_1']
         }, window=i, params={'shift': 0.01, 'scale': 200, 'window2': i*3})
         factors.append(spec)
-
+    
+    # ---- residual features ----
     for i in windows[1:]:
         spec = FactorSpec(name=FactorNames.DAILY_MOM_SUM, input_fields={
             ContextSrc.DAILY_QUOTATION: ['alpha'],
             ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total'],
         }, window=i, params={'shift': 0.0, 'scale': 50})
+        factors.append(spec)
+    for i in windows[1:]:
+        spec = FactorSpec(name=FactorNames.DAILY_VOLATILITY, input_fields={
+            ContextSrc.DAILY_QUOTATION: ['alpha'],
+            ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
+        }, window=i, params={'shift': 0.02, 'scale': 100})
+        factors.append(spec)
+    for i in windows[2:]:
+        spec = FactorSpec(name=FactorNames.DAILY_SKEWNESS, input_fields={
+            ContextSrc.DAILY_QUOTATION: ['alpha'],
+            ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
+        }, window=i, params={'shift': 0.0, 'scale': 1})
+        factors.append(spec)
+    for i in windows[3:]:
+        spec = FactorSpec(name=FactorNames.DAILY_KURTOSIS, input_fields={
+            ContextSrc.DAILY_QUOTATION: ['alpha'],
+            ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
+        }, window=i, params={'shift': 0.0, 'scale': 0.5})
         factors.append(spec)
     return factors
 
@@ -93,8 +110,8 @@ class TestFactorEngine(unittest.TestCase):
             row_nan_count = (np.isnan(value).sum(axis=1) > 0).sum()
             total_nan_count = np.isnan(value).sum()
             total_value = value.size
-            factor_name = factor.name + ' ' * (24 - len(factor.name))
-            desc_msgs.append(f'{i:03d} {factor_name} mean={mean:.4f},\tstd={std:.4f},\tmin={min:.4f},\tmax={max:.4f}\tcol nan={col_nan_count},\trow nan={row_nan_count},\ttotal nan={total_nan_count}/{total_value}')
+            factor_name = factor.name + ' ' * (27 - len(factor.name))
+            desc_msgs.append(f'{i:03d} {factor_name} mean={mean:.3f}\tstd={std:.3f}\tmin={min:.3f}\tmax={max:.3f}\tcnan={col_nan_count:03d},\trnan={row_nan_count:03d},\tnan={total_nan_count}/{total_value}')
         msg = 'factor_result:\n' + '\n'.join(desc_msgs)
         logger.info(msg)
         breakpoint()

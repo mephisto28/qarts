@@ -15,15 +15,19 @@ __all__ = [
 class DailySkewness(FactorFromDailyAndIntraday):
     num_daily_fields = 1 # daily_return
     num_intraday_fields = 0
-    num_factor_cache_fields = 1 # daily_mom_1
+    num_factor_cache_fields = 0 # daily_mom_1
 
     def __init__(self, input_fields: dict[str, list[str]], window: int = 5, **kwargs):
         super().__init__(input_fields=input_fields, window=window, **kwargs)
         self.history_return_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
-        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0] \
+            if ContextSrc.FACTOR_CACHE in self.input_fields else self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
 
     @property
     def name(self) -> str:
+        default_field = 'daily_return'
+        if self.history_return_field != default_field:
+            return f'{self.history_return_field}_{FactorNames.DAILY_SKEWNESS}_{self.window}'
         return f'{FactorNames.DAILY_SKEWNESS}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
@@ -34,7 +38,7 @@ class DailySkewness(FactorFromDailyAndIntraday):
         h_s3 = ops.history_window_pow_sum(self.history_return_field, 3, window=hist_window)
         h_cnt = ops.history_window_pow_sum(self.history_return_field, 0, window=hist_window)
         
-        today_ret = ops.now_factor(self.return_field)
+        today_ret = ops.now(self.return_field)
         
         # 3. 使用 Numba 并行计算最终因子
         _calc_skewness_kernel(
@@ -49,19 +53,23 @@ class DailySkewness(FactorFromDailyAndIntraday):
 class DailyKurtosis(FactorFromDailyAndIntraday):
     num_daily_fields = 1 # daily_return
     num_intraday_fields = 0
-    num_factor_cache_fields = 1 # intraday_mom
+    num_factor_cache_fields = 0 # intraday_mom
 
     def __init__(self, input_fields: dict[str, list[str]], window: int = 5, **kwargs):
         super().__init__(input_fields=input_fields, window=window, **kwargs)
         self.history_return_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
-        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0] \
+            if ContextSrc.FACTOR_CACHE in self.input_fields else self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
 
     @property
     def name(self) -> str:
+        default_field = 'daily_return'
+        if self.history_return_field != default_field:
+            return f'{self.history_return_field}_{FactorNames.DAILY_KURTOSIS}_{self.window}'
         return f'{FactorNames.DAILY_KURTOSIS}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        today_ret = ops.now_factor(self.return_field)
+        today_ret = ops.now(self.return_field)
         hist_window = self.window - 1
         h_s1 = ops.history_window_pow_sum(self.history_return_field, 1, window=hist_window)
         h_s2 = ops.history_window_pow_sum(self.history_return_field, 2, window=hist_window)

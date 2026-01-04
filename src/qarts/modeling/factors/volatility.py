@@ -16,17 +16,21 @@ __all__ = [
 @register_factor(FactorNames.DAILY_VOLATILITY)
 class DailyVolatility(FactorFromDailyAndIntraday):
     num_daily_fields = 1 # daily_return
-    num_intraday_fields = 0
-    num_factor_cache_fields = 1 # daily_mom_1
+    num_intraday_fields = -1
+    num_factor_cache_fields = -1 # daily_mom_1
 
     def __init__(self, input_fields: dict[str, list[str]], window: int = 5, **kwargs):
         super().__init__(input_fields=input_fields, window=window, **kwargs)
         self.history_return_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
-        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+        self.return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0] \
+            if ContextSrc.FACTOR_CACHE in self.input_fields else self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
 
     @property
     def name(self) -> str:
-        return f'daily_volatility_{self.window}'
+        default_field = 'daily_return'
+        if self.history_return_field != default_field:
+            return f'{self.history_return_field}_{FactorNames.DAILY_VOLATILITY}_{self.window}'
+        return f'{FactorNames.DAILY_VOLATILITY}_{self.window}'
 
     @staticmethod
     @expand_tdim
@@ -38,7 +42,7 @@ class DailyVolatility(FactorFromDailyAndIntraday):
         return hist_ss, valid_count
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        today_ret = ops.now_factor(self.return_field)
+        today_ret = ops.now(self.return_field)
         hist_ss, valid_count = self.history_sq_cumsum_with_count(ops, self.history_return_field, self.window - 1)
         np.square(today_ret, out=out) # inplace op to reduce memory allocation cost
         out += hist_ss
@@ -50,19 +54,23 @@ class DailyVolatility(FactorFromDailyAndIntraday):
 class DailyVolVol(FactorFromDailyAndIntraday):
 
     num_daily_fields = 1 
-    num_intraday_fields = 0
-    num_factor_cache_fields = 1
+    num_intraday_fields = -1
+    num_factor_cache_fields = -1
 
     def __init__(self, input_fields: dict[str, list[str]], window: int = 20, window2: int = 20, **kwargs):
         super().__init__(input_fields=input_fields, window=window+window2, **kwargs)
         self.vol_window = window
         self.volvol_window = window2
         self.daily_ret_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
-        self.intraday_ret_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+        self.intraday_ret_field = self.input_fields[ContextSrc.FACTOR_CACHE][0] \
+            if ContextSrc.FACTOR_CACHE in self.input_fields else self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
 
     @property
     def name(self) -> str:
-        return f'vol_of_vol_{self.vol_window}_{self.volvol_window}'
+        default_field = 'daily_return'
+        if self.daily_ret_field != default_field:
+            return f'{self.daily_ret_field}_{FactorNames.DAILY_VOLVOL}_{self.vol_window}_{self.volvol_window}'
+        return f'{FactorNames.DAILY_VOLVOL}_{self.vol_window}_{self.volvol_window}'
     
     @staticmethod
     def history_vol_sequence(ops: ContextOps, field: str, window: int, 
@@ -85,7 +93,7 @@ class DailyVolVol(FactorFromDailyAndIntraday):
         return vol_sum_suffix, vol_sq_sum_suffix
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
-        today_ret = ops.now_factor(self.intraday_ret_field) 
+        today_ret = ops.now(self.intraday_ret_field) 
         history_r2_suffix = ops.history_pow_cumsum(self.daily_ret_field, power=2)
         hist_vol_sum, hist_vol_sq_sum = self.history_volvol_prepared_stats(ops, self.daily_ret_field, self.vol_window)
 

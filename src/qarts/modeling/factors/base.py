@@ -54,21 +54,12 @@ class FactorFromDailyAndIntraday(Factor):
     def _check_inputs_valid(self):
         if self.num_daily_fields > 0:
             assert len(self.input_fields[ContextSrc.DAILY_QUOTATION]) == self.num_daily_fields
-        else:
-            if ContextSrc.DAILY_QUOTATION in self.input_fields:
-                assert len(self.input_fields[ContextSrc.DAILY_QUOTATION]) == 0
                 
         if self.num_intraday_fields > 0:
             assert len(self.input_fields[ContextSrc.INTRADAY_QUOTATION]) == self.num_intraday_fields
-        else:
-            if ContextSrc.INTRADAY_QUOTATION in self.input_fields:
-                assert len(self.input_fields[ContextSrc.INTRADAY_QUOTATION]) == 0
         
         if self.num_factor_cache_fields > 0:
             assert len(self.input_fields[ContextSrc.FACTOR_CACHE]) == self.num_factor_cache_fields
-        else:
-            if ContextSrc.FACTOR_CACHE in self.input_fields:
-                assert len(self.input_fields[ContextSrc.FACTOR_CACHE]) == 0
 
 
 _factors_registry: T.Dict[str, type['Factor']] = {}

@@ -12,7 +12,15 @@ class BaseOps:
     def now(self, field: str, window: int = -1) -> np.ndarray:
         assert ContextSrc.INTRADAY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.INTRADAY_QUOTATION]
-        return block.get_current_view(field, window)
+        if field in block.fields:
+            return block.get_current_view(field, window)
+        else:
+            block = self.context.blocks[ContextSrc.FACTOR_CACHE]
+            if field in block.fields:
+                return block.get_current_view(field, window)
+            else:
+                raise ValueError(f"Field {field} not found in factor cache")
+            
 
     def now_factor(self, field: str, window: int = -1) -> np.ndarray:
         assert ContextSrc.FACTOR_CACHE in self.context.blocks
