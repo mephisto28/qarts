@@ -2,7 +2,6 @@ import unittest
 
 import numpy as np
 from qarts.modeling.factors import create_mock_context, DailyVolVol, ContextSrc, ContextOps
-from qarts.modeling.factors.volatility import DailyVolatility
 
 
 class TestVolVol(unittest.TestCase):
@@ -30,7 +29,7 @@ class TestVolVol(unittest.TestCase):
         eps = eps.mean() / np.abs(arr2).mean()
         self.assertAlmostEqual(eps, 0, places=3, msg=f'eps={eps} arr1={arr1[:5, :5]} arr2={arr2[:5, :5]}')
 
-    def test_vol(self):
+    def test_volvol(self):
         vacancy_index = 1
         for window in [2, 5, 30]:
             # out = self.context.get_field(ContextSrc.FACTOR_CACHE, 'vacancy_0')

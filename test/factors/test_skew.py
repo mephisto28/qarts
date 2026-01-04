@@ -26,7 +26,7 @@ class TestHighOrder(unittest.TestCase):
         eps = eps.mean() / np.abs(arr2).mean()
         self.assertAlmostEqual(eps, 0, places=3, msg=f'eps={eps} arr1={arr1[:5, :5]} arr2={arr2[:5, :5]}')
 
-    def test_vol(self):
+    def test_skewness(self):
         for window in [5, 50]:
             out1 = np.empty_like(self.context.get_field(ContextSrc.INTRADAY_QUOTATION, 'mid_price'))
             factor = DailySkewness(
