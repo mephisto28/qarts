@@ -8,6 +8,6 @@ from .high_order import *
 
 from .targets import *
 
-from .engine import IntradayBatchProcessingEngine, IntradayOnlineProcessingEngine
-from .context import create_mock_context, ContextSrc
+from .engine import PipelineFactory, IntradayBatchProcessingEngine, IntradayOnlineProcessingEngine
+from .context import FactorContext, create_mock_context, ContextSrc
 from .ops import ContextOps

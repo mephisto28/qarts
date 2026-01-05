@@ -67,7 +67,7 @@ class FactorContext:
         return block.get_view(field)
 
     @classmethod
-    def from_daily_block(cls, daily_block: PanelBlockDense | PanelBlockIndexed) -> 'FactorContext':
+    def from_daily_block(cls, daily_block: PanelBlockDense | PanelBlockIndexed, is_future: bool = False) -> 'FactorContext':
         if isinstance(daily_block, PanelBlockIndexed):
             columns = list(daily_block.data.columns)
             daily_block = PanelBlockDense.from_indexed_block(
@@ -76,10 +76,11 @@ class FactorContext:
                 fill_methods=[1 for _ in columns],
                 frequency='1D',
             )
+        src = ContextSrc.FUTURE_DAILY_QUOTATION if is_future else ContextSrc.DAILY_QUOTATION
         return cls(
             n_inst=len(daily_block.instruments),
             inst_categories=daily_block.instruments,
-            blocks={ContextSrc.DAILY_QUOTATION: daily_block}
+            blocks={src: daily_block}
         )
 
 
