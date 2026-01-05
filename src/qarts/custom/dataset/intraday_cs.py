@@ -24,11 +24,16 @@ class IntradayDataset(data.Dataset):
         self.loader = ParquetPanelLoader()
         
         self.factor_group_name = config.get('factor_group', 'default')
-        self.factor_group = get_factor_group(self.factor_group_name)()
+        self.factor_group = get_factor_group(self.factor_group_name)
         self.target_group_name = config.get('target_group', 'default')
-        self.target_group = get_factor_group(self.target_group_name)()
-        self.factor_pipeline = PipelineFactory(self.factor_group).create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
-        self.target_pipeline = PipelineFactory(self.target_group).create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
+        self.target_group = get_factor_group(self.target_group_name)
+        self.factor_factory = PipelineFactory(self.factor_group)
+        self.target_factory = PipelineFactory(self.target_group)
+        self.factor_pipeline = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
+        self.target_pipeline = self.target_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
+        self.intraday_fields = list(set(
+            self.factor_factory.input_fields[ContextSrc.INTRADAY_QUOTATION] + \
+            self.target_factory.input_fields[ContextSrc.INTRADAY_QUOTATION]))
 
         self.intraday_prefix = config['intraday_prefix']
         self.sample_per_day = config.get('sample_per_day', 1)
@@ -55,7 +60,7 @@ class IntradayDataset(data.Dataset):
     def load_daily_data(self):
         required_daily_fields = list(set(
             self.factor_factory.input_fields[ContextSrc.DAILY_QUOTATION] + \
-            self.target_factory.input_fields[ContextSrc.DAILY_QUOTATION]))
+            self.target_factory.input_fields[ContextSrc.FUTURE_DAILY_QUOTATION]))
         required_daily_fields_before_adjustment = list(set([field.replace('adjusted_', '') for field in required_daily_fields]))
         daily_block = self.loader.load_daily_quotation(fields=required_daily_fields_before_adjustment + ['instrument', 'factor'])
         daily_fields_require_adjustment = [field.replace('adjusted_', '') for field in required_daily_fields if field.startswith('adjusted_')]
@@ -105,7 +110,7 @@ class IntradayDataset(data.Dataset):
 
     def __getitem__(self, index: int):
         f = self.files[index]
-        date = pd.Timestamp(os.path.basename(f).split('.'))
+        date = pd.Timestamp(os.path.basename(f).split('.')[0])
         context = self.init_context_with_daily(date)
         context_future = self.init_future_context_with_daily(context, date)
         intraday_block = self.load_intraday_block(context, date)
@@ -113,10 +118,9 @@ class IntradayDataset(data.Dataset):
         context_future.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
         factors_block = self.factor_pipeline(context)
         targets_block = self.target_pipeline(context_future)
-        return factors_block.values, targets_block.values
+        return factors_block.data, targets_block.data
 
     def __len__(self):
         return len(self.files)
 
 
-        
