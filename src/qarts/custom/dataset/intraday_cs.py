@@ -14,8 +14,10 @@ from qarts.loader import ParquetPanelLoader, VariableLoadSpec
 from qarts.modeling.factors import PipelineFactory, ContextSrc, FactorContext
 from qarts.custom.factor import get_factor_group
 
+from .registry import register_dataset
 
 
+@register_dataset('intraday_cs')
 class IntradayDataset(data.Dataset):
 
     def __init__(self, config: dict, is_training: bool = False):
@@ -52,10 +54,13 @@ class IntradayDataset(data.Dataset):
             file for file in self.all_files 
             if os.path.basename(file) >= start_date.strftime('%Y%m%d') and os.path.basename(file) <= end_date.strftime('%Y%m%d') 
         ]
+        self.start_date = start_date
+        self.end_date = end_date
         logger.info(f'Loading {len(self.files)}/{len(self.all_files)} files {start_date.date()}-{end_date.date()} from {self.intraday_prefix}')
         logger.info(f'Loaded data from {start_date.date()} to {end_date.date()} {len(self.files)} files, is_training: {self.is_training}')
 
         self.daily_block, self.daily_fields_require_adjustment = self.load_daily_data()
+        logger.info(f'Dataset prepared.')
 
     def load_daily_data(self):
         required_daily_fields = list(set(
@@ -65,6 +70,7 @@ class IntradayDataset(data.Dataset):
         daily_block = self.loader.load_daily_quotation(fields=required_daily_fields_before_adjustment + ['instrument', 'factor'])
         daily_fields_require_adjustment = [field.replace('adjusted_', '') for field in required_daily_fields if field.startswith('adjusted_')]
         daily_block.ensure_order('datetime-first')
+        daily_block = daily_block.between(start_date=self.start_date, end_date=self.end_date + datetime.timedelta(days=7))
         return daily_block, daily_fields_require_adjustment
 
     def init_context_with_daily(self, date: pd.Timestamp):
