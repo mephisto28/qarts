@@ -263,7 +263,10 @@ class DailyPanelBlockIndexed(PanelBlockIndexed):
         factor = daily_df['factor']
         for field in fields:
             new_field = 'adjusted_' + field
-            daily_df[new_field] = daily_df[field] / factor * last_factor
+            if field in ('volume', 'turnover', 'amount'):
+                daily_df[new_field] = daily_df[field] * factor / last_factor
+            else:
+                daily_df[new_field] = daily_df[field] / factor * last_factor
             if new_field not in self.fields:
                 self.fields.append(new_field)
 
