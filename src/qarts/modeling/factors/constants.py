@@ -14,3 +14,8 @@ class FactorNames:
     DAILY_KURTOSIS = 'daily_kurtosis'
 
     INTRADAY_MOM = 'intraday_mom'
+
+    # targets
+    FUTURE_DAY_TARGETS = 'future_day_targets'
+    TODAY_TARGETS = 'today_targets'
+    

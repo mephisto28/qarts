@@ -86,12 +86,25 @@ def generate_factor_specs():
             ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
         }, window=i, params={'shift': 0.0, 'scale': 0.5})
         factors.append(spec)
+
+    # ---- targets ----
+    for i in [0, 1, 2, 3]:
+        spec = FactorSpec(name=FactorNames.FUTURE_DAY_TARGETS, input_fields={
+            ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_close'],
+            ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
+    for i in [10, 30, 60]:
+        spec = FactorSpec(name=FactorNames.TODAY_TARGETS, input_fields={
+            ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'bid_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
     return factors
 
 
 class TestFactorEngine(unittest.TestCase):
 
-    def test_factor_engine(self):
+    def test_features_smoketest(self):
         factors = generate_factor_specs()
         loader = ParquetPanelLoader()
         engine = IntradayBatchProcessingEngine(loader, factors)
@@ -114,5 +127,7 @@ class TestFactorEngine(unittest.TestCase):
             desc_msgs.append(f'{i:03d} {factor_name} mean={mean:.3f}\tstd={std:.3f}\tmin={min:.3f}\tmax={max:.3f}\tcnan={col_nan_count:03d},\trnan={row_nan_count:03d},\tnan={total_nan_count}/{total_value}')
         msg = 'factor_result:\n' + '\n'.join(desc_msgs)
         logger.info(msg)
-        breakpoint()
+
+    def test_targets_smoketest(self):
+        pass
 

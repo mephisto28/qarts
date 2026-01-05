@@ -6,6 +6,7 @@ import numpy as np
 from loguru import logger
 
 from qarts.core import FactorPanelBlockDense, IntradayPanelBlockDense, DailyPanelBlockIndexed
+from qarts.core.panel import PanelBlockDense
 from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
 from .base import FactorSpec, get_factor
 from .context import ContextSrc, FactorContext
@@ -98,21 +99,33 @@ class IntradayBatchProcessingEngine:
         daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
         daily_block.ensure_order('instrument-first')
         context = FactorContext.from_daily_block(daily_block)
+        
+        end_date = date + datetime.timedelta(days=21)
+        daily_block_future: DailyPanelBlockIndexed = self.daily_block.between(start_date=date, end_date=end_date)
+        daily_block_future.adjust_field_by_first(fields=self.daily_fields_require_adjustment)
+        daily_block_future.ensure_order('instrument-first')
+        columns = list(daily_block.data.columns)
+        daily_block_future = PanelBlockDense.from_indexed_block(
+            daily_block_future,
+            required_columns=columns,
+            fill_methods=[1 for _ in columns],
+            frequency='1D',
+            inst_cats=context.inst_categories
+        )
+        context.register_block(ContextSrc.FUTURE_DAILY_QUOTATION, daily_block_future)
 
         load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={'date': date, 'fields': self.intraday_fields + ['instrument']})
         block = self.loader.load_intraday(load_spec)
-        context.register_block(
-            ContextSrc.INTRADAY_QUOTATION, 
-            IntradayPanelBlockDense.from_indexed_block(
-                block, 
-                required_columns=self.intraday_fields, 
-                fill_methods=[1 for _ in self.intraday_fields],
-                frequency='1min',
-                inst_cats=context.inst_categories,
-                is_intraday=True,
-                max_nan_count=100
-            )
+        intraday_block = IntradayPanelBlockDense.from_indexed_block(
+            block, 
+            required_columns=self.intraday_fields, 
+            fill_methods=[1 for _ in self.intraday_fields],
+            frequency='1min',
+            inst_cats=context.inst_categories,
+            is_intraday=True,
+            max_nan_count=100
         )
+        context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
         
         # factor_compute = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
         # factors_block = factor_compute(context)

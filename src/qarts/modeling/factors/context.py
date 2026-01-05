@@ -28,7 +28,7 @@ class FactorContext:
     current_cursor: int = -1
 
     def register_block(self, src: ContextSrc, block: PanelBlockDense):
-        assert src in (ContextSrc.DAILY_QUOTATION, ContextSrc.INTRADAY_QUOTATION, ContextSrc.FACTOR_CACHE), f"Invalid source: {src}"
+        assert src in (ContextSrc.DAILY_QUOTATION, ContextSrc.INTRADAY_QUOTATION, ContextSrc.FACTOR_CACHE, ContextSrc.FUTURE_DAILY_QUOTATION), f"Invalid source: {src}"
         self.blocks[src] = block
 
     def register_cache(self, key, shape, dtype=np.float32, scope=None):

@@ -1,0 +1,83 @@
+import numpy as np
+import numba as nb
+
+from .ops import ContextOps
+from .context import ContextSrc
+from .base import register_factor, FactorFromDailyAndIntraday
+from .constants import FactorNames
+
+__all__ = [
+    'FutureDayTargets',
+    'TodayTargets',
+]
+
+
+@register_factor(FactorNames.FUTURE_DAY_TARGETS)
+class FutureDayTargets(FactorFromDailyAndIntraday):
+    num_intraday_fields = 2
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.future_price_field = self.input_fields[ContextSrc.FUTURE_DAILY_QUOTATION][0]
+        self.buy_price_field, self.mid_price_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION]
+
+    @property
+    def name(self) -> str:
+        default_field = 'adjusted_close'
+        if self.future_price_field != default_field:
+            return f'{self.future_price_field}_{FactorNames.FUTURE_DAY_TARGETS}_{self.window}'
+        return f'{FactorNames.FUTURE_DAY_TARGETS}_{self.window}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        future_values = ops.future_n_days(self.future_price_field, window=self.window)
+        buy_price = ops.now(self.buy_price_field)
+        mid_price = ops.now(self.mid_price_field)
+        cur_price = np.where(buy_price == 0, mid_price, buy_price)
+        out[:] = np.log(future_values) - np.log(cur_price)
+        # out /= np.sqrt(self.window + 1)
+
+
+@register_factor(FactorNames.TODAY_TARGETS)
+class TodayTargets(FactorFromDailyAndIntraday):
+    num_intraday_fields = 3
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.buy_field, self.sell_field, self.mid_price = self.input_fields[ContextSrc.INTRADAY_QUOTATION]
+
+    @property
+    def name(self) -> str:
+        if self.buy_field != 'ask_price1':
+            return f'{self.buy_field}_{self.sell_field}_{FactorNames.TODAY_TARGETS}_{self.window}'
+        return f'{FactorNames.TODAY_TARGETS}_{self.window}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        buy_price = ops.now(self.buy_field)
+        sell_price = ops.now(self.sell_field)
+        mid_price = ops.now(self.mid_price)
+        compute_targets(buy_price, sell_price, mid_price, out, self.window)
+        # out[:] *= 15 # sqrt(240)
+        # out[:] /= np.sqrt(self.window)
+
+
+@nb.jit
+def compute_targets(
+    buy_price: np.ndarray,
+    sell_price: np.ndarray,
+    mid_price: np.ndarray,
+    out: np.ndarray,
+    future_window: int
+):
+    N, T = buy_price.shape
+    for i in nb.prange(N):
+        for t in range(T):
+            t_future = min(t + future_window, T - 1)
+            mid_price_now = mid_price[i, t]
+            buy_price_now = buy_price[i, t]
+            if buy_price_now == 0:
+                buy_price_now = mid_price_now
+            mid_price_future = mid_price[i, t_future]
+            sell_price_future = sell_price[i, t_future]
+            if sell_price_future == 0:
+                sell_price_future = mid_price_future
+            out[i, t] = np.log(sell_price_future) - np.log(buy_price_now)

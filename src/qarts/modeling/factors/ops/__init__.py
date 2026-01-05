@@ -1,7 +1,8 @@
 from .daily_common import DailyOps
+from .targets import TargetsOps
 
 
-class ContextOps(DailyOps):
+class ContextOps(DailyOps, TargetsOps):
     pass
 
 

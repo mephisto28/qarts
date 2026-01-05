@@ -7,16 +7,16 @@ from dataclasses import dataclass, field
 import numpy as np
 from .base import BaseOps
 from .utils import context_static_cache, expand_tdim
-from .. import kernels as kns
 from ..context import ContextSrc
 
 
 class TargetsOps(BaseOps):
 
-    def future_n_days(self, field: str, n: int) -> np.ndarray:
+    @expand_tdim
+    def future_n_days(self, field: str, window: int = 1) -> np.ndarray:
         assert ContextSrc.FUTURE_DAILY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.FUTURE_DAILY_QUOTATION]
-        return block.get_view(field)[:, n]
+        return block.get_view(field)[:, window]
 
     def today(self, field: str) -> np.ndarray:
         return self.future_n_days(field, n=0)
