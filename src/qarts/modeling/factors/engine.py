@@ -7,6 +7,7 @@ from loguru import logger
 
 from qarts.core import FactorPanelBlockDense, IntradayPanelBlockDense, DailyPanelBlockIndexed
 from qarts.core.panel import PanelBlockDense
+from qarts.utils.profiler import TimerProfiler
 from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
 from .base import FactorSpec, get_factor
 from .context import ContextSrc, FactorContext
@@ -57,6 +58,7 @@ class IntradayBatchProcessingEngine:
         self.factors = self.factor_factory.factors
         self.daily_block, self.daily_fields_require_adjustment = self._load_daily_block()
         self.intraday_fields = self.factor_factory.input_fields[ContextSrc.INTRADAY_QUOTATION]
+        self.profiler = TimerProfiler()
     
     def _load_daily_block(self) -> tuple[DailyPanelBlockIndexed, list[str]]:
         required_daily_fields = self.factor_factory.input_fields[ContextSrc.DAILY_QUOTATION]
@@ -91,60 +93,66 @@ class IntradayBatchProcessingEngine:
     
     def process_factor(self, date: datetime.datetime) -> FactorPanelBlockDense:
         logger.info(f"Processing date: {date}")
-        start_date = date - datetime.timedelta(days=300) # 200
-        yesterday = date - datetime.timedelta(days=1)
-        daily_block = self.daily_block.between(start_date=start_date, end_date=date)
-        daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
-        daily_block = daily_block.filter_instrument_by_count(min_count=180)
-        daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
-        daily_block.ensure_order('instrument-first')
-        context = FactorContext.from_daily_block(daily_block)
+        with self.profiler.section('daily_history'):
+            start_date = date - datetime.timedelta(days=300) # 200
+            yesterday = date - datetime.timedelta(days=1)
+            daily_block = self.daily_block.between(start_date=start_date, end_date=date)
+            daily_block.adjust_field_by_last(fields=self.daily_fields_require_adjustment)
+            daily_block = daily_block.filter_instrument_by_count(min_count=180)
+            daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
+            daily_block.ensure_order('instrument-first')
+            context = FactorContext.from_daily_block(daily_block)
         
-        end_date = date + datetime.timedelta(days=21)
-        daily_block_future: DailyPanelBlockIndexed = self.daily_block.between(start_date=date, end_date=end_date)
-        daily_block_future.adjust_field_by_first(fields=self.daily_fields_require_adjustment)
-        daily_block_future.ensure_order('instrument-first')
-        columns = list(daily_block.data.columns)
-        daily_block_future = PanelBlockDense.from_indexed_block(
-            daily_block_future,
-            required_columns=columns,
-            fill_methods=[1 for _ in columns],
-            frequency='1D',
-            inst_cats=context.inst_categories
-        )
-        context.register_block(ContextSrc.FUTURE_DAILY_QUOTATION, daily_block_future)
+        with self.profiler.section('daily_future'):
+            end_date = date + datetime.timedelta(days=21)
+            daily_block_future: DailyPanelBlockIndexed = self.daily_block.between(start_date=date, end_date=end_date)
+            daily_block_future.adjust_field_by_first(fields=self.daily_fields_require_adjustment)
+            daily_block_future.ensure_order('instrument-first')
+            columns = list(daily_block.data.columns)
+            daily_block_future = PanelBlockDense.from_indexed_block(
+                daily_block_future,
+                required_columns=columns,
+                fill_methods=[1 for _ in columns],
+                frequency='1D',
+                inst_cats=context.inst_categories
+            )
+            context.register_block(ContextSrc.FUTURE_DAILY_QUOTATION, daily_block_future)
 
-        load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={'date': date, 'fields': self.intraday_fields + ['instrument']})
-        block = self.loader.load_intraday(load_spec)
-        intraday_block = IntradayPanelBlockDense.from_indexed_block(
-            block, 
-            required_columns=self.intraday_fields, 
-            fill_methods=[1 for _ in self.intraday_fields],
-            frequency='1min',
-            inst_cats=context.inst_categories,
-            is_intraday=True,
-            max_nan_count=100
-        )
-        context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
+        with self.profiler.section('intraday_load'):
+            load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={'date': date, 'fields': self.intraday_fields + ['instrument']})
+            block = self.loader.load_intraday(load_spec)
+            intraday_block = IntradayPanelBlockDense.from_indexed_block(
+                block, 
+                required_columns=self.intraday_fields, 
+                fill_methods=[1 for _ in self.intraday_fields],
+                frequency='1min',
+                inst_cats=context.inst_categories,
+                is_intraday=True,
+                max_nan_count=100
+            )
+            context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
         
         # factor_compute = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
         # factors_block = factor_compute(context)
-        factors_block = FactorPanelBlockDense.init_empty_from_context(
-            context.inst_categories,
-            timestamps=context.blocks[ContextSrc.INTRADAY_QUOTATION].timestamps,
-            fields=[f.name for f in self.factors],
-            freq=context.blocks[ContextSrc.INTRADAY_QUOTATION].frequency
-        )
-        factors_block.is_valid_instruments = context.blocks[ContextSrc.INTRADAY_QUOTATION].is_valid_instruments
-        context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
-        context_ops = ContextOps(context, is_online=False)
-        for i, factor in enumerate(self.factors):
-            placeholder = factors_block.data[i]
-            factor.compute_from_context(context_ops, placeholder)
-        for i, factor in enumerate(self.factors):
-            value = factors_block.data[i]
-            value -= factor.shift
-            value *= factor.scale
+        with self.profiler.section('factor_init'):
+            factors_block = FactorPanelBlockDense.init_empty_from_context(
+                context.inst_categories,
+                timestamps=context.blocks[ContextSrc.INTRADAY_QUOTATION].timestamps,
+                fields=[f.name for f in self.factors],
+                freq=context.blocks[ContextSrc.INTRADAY_QUOTATION].frequency
+            )
+            factors_block.is_valid_instruments = context.blocks[ContextSrc.INTRADAY_QUOTATION].is_valid_instruments
+            context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
+
+        with self.profiler.section('factor_compute'):
+            context_ops = ContextOps(context, is_online=False)
+            for i, factor in enumerate(self.factors):
+                placeholder = factors_block.data[i]
+                factor.compute_from_context(context_ops, placeholder)
+            for i, factor in enumerate(self.factors):
+                value = factors_block.data[i]
+                value -= factor.shift
+                value *= factor.scale
         return factors_block
 
     def iterate_tasks(self) -> T.Generator[tuple[datetime.date, FactorPanelBlockDense], None, None]:
