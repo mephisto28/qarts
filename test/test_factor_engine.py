@@ -7,6 +7,7 @@ from qarts.modeling.factors import FactorNames, FactorSpec, ContextSrc
 from qarts.loader import ParquetPanelLoader
 from qarts.modeling.factors.engine import IntradayBatchProcessingEngine, FactorSpec, ContextSrc
 from qarts.modeling.factors.high_order import DailyKurtosis
+from qarts.custom.factor.factor_group import get_factor_group
 
 
 def generate_factor_specs():
@@ -105,7 +106,7 @@ def generate_factor_specs():
 class TestFactorEngine(unittest.TestCase):
 
     def test_features_smoketest(self):
-        factors = generate_factor_specs()
+        factors = get_factor_group('default') + get_factor_group('targets_with_costs_10m_3D_with_range')
         loader = ParquetPanelLoader()
         engine = IntradayBatchProcessingEngine(loader, factors)
         desc_msgs = []

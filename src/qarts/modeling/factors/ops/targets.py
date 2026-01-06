@@ -24,15 +24,15 @@ class TargetsOps(BaseOps):
     @context_static_cache
     def _future_prefix_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'future_prefix_high') -> np.ndarray:
         data = self.context.get_field(src=ContextSrc.FUTURE_DAILY_QUOTATION, field=field)
-        out = data[1:].copy()
-        np.fmax.accumulate(data[1:], axis=1, out=out)
+        out = data[:, 1:].copy()
+        np.fmax.accumulate(data[:, 1:], axis=1, out=out)
         return out
     
     @context_static_cache
     def _future_prefix_low(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'future_prefix_low') -> np.ndarray:
         data = self.context.get_field(src=ContextSrc.FUTURE_DAILY_QUOTATION, field=field)
-        out = data[1:].copy()
-        np.fmin.accumulate(data[1:], axis=1, out=out)
+        out = data[:, 1:].copy()
+        np.fmin.accumulate(data[:, 1:], axis=1, out=out)
         return out
     
     @expand_tdim
@@ -47,10 +47,12 @@ class TargetsOps(BaseOps):
         return future_price / today_close
       
     @expand_tdim
-    def future_highest_over_today_close(self, field: str, window: int = 1) -> np.ndarray:
-        high = self._future_prefix_high(field)[window - 1]
-        today_close = self.today(field)
-        return high / today_close
+    def future_highest(self, field: str, window: int = 1) -> np.ndarray:
+        return self._future_prefix_high(field)[:, window - 1]
+
+    @expand_tdim
+    def future_lowest(self, field: str, window: int = 1) -> np.ndarray:
+        return self._future_prefix_low(field)[:, window - 1]
 
     def intraday_targets(self, field: str, window: int = 10) -> np.ndarray:
         price = self.now(field) # (N, T)

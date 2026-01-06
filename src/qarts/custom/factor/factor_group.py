@@ -96,18 +96,34 @@ def generate_default_group() -> list[FactorSpec]:
     return factors
 
 
-@register_factor_group('targets_with_costs_10m_3D')
+@register_factor_group('targets_with_costs_10m_3D_with_range')
 def generate_targets_with_costs_10m_3D_group() -> list[FactorSpec]:
     factors = []
-    for i in [0, 1, 2, 3]:
+    for i in [3, 2, 1, 0]:
         spec = FactorSpec(name=FactorNames.FUTURE_DAY_TARGETS, input_fields={
             ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_close'],
             ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'mid_price']
         }, window=i)
         factors.append(spec)
-    for i in [10, 30, 60]:
+    for i in [60, 30, 10]:
         spec = FactorSpec(name=FactorNames.TODAY_TARGETS, input_fields={
             ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'bid_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
+    for i in [3, 2, 1]:
+        spec = FactorSpec(name=FactorNames.FUTURE_DAY_RANGE_TARGETS, input_fields={
+            ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_high', 'adjusted_low'],
+            ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
+        spec = FactorSpec(name=FactorNames.FUTURE_DAY_UP_RANGE_TARGETS, input_fields={
+            ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_high'],
+            ContextSrc.INTRADAY_QUOTATION: ['mid_price']
+        }, window=i)
+        factors.append(spec)
+        spec = FactorSpec(name=FactorNames.FUTURE_DAY_DOWN_RANGE_TARGETS, input_fields={
+            ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_low'],
+            ContextSrc.INTRADAY_QUOTATION: ['mid_price']
         }, window=i)
         factors.append(spec)
     return factors
