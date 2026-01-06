@@ -2,6 +2,7 @@ import os
 import json
 import random
 
+import fire
 import torch
 import numpy as np
 from loguru import logger
@@ -20,14 +21,14 @@ def set_seed(seed=42):
     logger.info(f'Using seed: {seed}')
 
 
-
-def main():
+@fire.Fire
+def main(exp_name: str):
     set_seed(42)
     d = os.path.dirname
     project_dir = d(d(os.path.abspath(__file__)))
-    config_path = os.path.join(project_dir, 'config', 'train_example', 'mlp.json')
+    config_path = os.path.join(project_dir, 'experiments', 'config', f'{exp_name}.json')
     config = json.load(open(config_path))
-    trainer = Trainer(config=config)
+    trainer = Trainer(config=config, name=exp_name)
     trainer.train()
 
 if __name__ == "__main__":

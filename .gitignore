@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# draft
+test/playground.py
+
+# experiments outputs
+experiments/output/

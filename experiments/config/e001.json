@@ -58,7 +58,7 @@
             "eta_min": 1e-6
         },
         "log_interval": 1,
-        "num_workers": 6,
+        "num_workers": 0,
         "dtype": "fp32",
         "device": "cuda"
     }

@@ -1,5 +1,7 @@
 {
+    "daily_quotation_path": "/mnt/nvme03/tdata/01_Formatted/01_Daily/ohlca_1D_barra4_alpha.parquet",
     "quotation_prefix": "/mnt/nvme03/tdata/02_Processed/99_Training/1min_v4__pca1D_5_total__barra4_total/",
+    "factor_prefix": "/mnt/nvme03/tdata/03_Statistics/03_Intraday_Factors/",
     "prediction_prefix": "/home/zwshi/projects/tdata2/99_Daily/03_modeling/output/",
 
     "date_format": "%Y%m%d"

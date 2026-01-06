@@ -1,9 +1,9 @@
 import os
 import json
-import random
+import glob
 
 import torch
-import numpy as np
+import wandb
 from loguru import logger
 from torch.utils.data import DataLoader
 
@@ -14,11 +14,16 @@ from qarts.custom.dataset import get_dataset, get_collate_fn
 
 class Trainer:
 
-    def __init__(self, config: dict | str):
+    def __init__(self, config: dict | str, name: str):
+        d = os.path.dirname
+        project_dir = d(d(d(d(d(os.path.abspath(__file__))))))
         if isinstance(config, str):
             config = json.load(open(config))
         self.config = config
-        logger.info(f'Config: {self.config}')
+        self.name = name
+        self.output_dir = os.path.join(project_dir, 'experiments', 'output', name)
+        logger.info(f'Model {name} Config: {self.config}\nResults will be saved to {self.output_dir}')
+
         self.dtype = {"fp16": torch.float16, "fp32": torch.float32, "bf16": torch.bfloat16}[config['train'].get('dtype', 'fp32')]
         self.device = config['train'].get('device', 'cuda')
 
@@ -77,6 +82,38 @@ class Trainer:
         else:
             raise ValueError(f'Loss function type {loss_fn_type} not supported')
 
+    def load_model(self, epoch: int = -1):
+        prefix = os.path.join(self.output_dir, 'ckpt')
+        os.makedirs(prefix, exist_ok=True)
+        model_paths = sorted(glob.glob(os.path.join(prefix, 'model_e*.pth')))
+        if len(model_paths) == 0:
+            logger.warning(f'No model found at {prefix}')
+            return
+
+        model_path = model_paths[epoch]
+        opt_path = model_path.replace('model_e', 'optimizer_e')
+        if os.path.exists(model_path) and os.path.exists(opt_path):
+            self.model.load_state_dict(torch.load(model_path))
+            self.optimizer.load_state_dict(torch.load(opt_path)['optimizer'])
+            self.lr_scheduler.load_state_dict(torch.load(opt_path)['lr_scheduler'])
+        else:
+            raise FileNotFoundError(f'Model or optimizer not found at {model_path} / {opt_path}')
+        logger.info(f'Model loaded from {model_path}')
+
+
+    def save_model(self, epoch: int):
+        prefix = os.path.join(self.output_dir, 'ckpt')
+        model_path = f'model_e{epoch:02d}.pth'
+        opt_path = f'optimizer_e{epoch:02d}.pth'
+        state_dict = self.model.state_dict()
+        torch.save(state_dict, os.path.join(prefix, model_path))
+        opt_state_dict = {
+            'optimizer': self.optimizer.state_dict(),
+            'lr_scheduler': self.lr_scheduler.state_dict(),
+        }
+        torch.save(opt_state_dict, os.path.join(prefix, opt_path))
+        logger.info(f'Model saved to {prefix}: {model_path} / {opt_path}')
+
     def train(self):
         train_config = self.train_config
         collate_fn = get_collate_fn(self.dataset_config['collate_fn'], **self.dataset_config['collate_fn_params'])
@@ -87,8 +124,12 @@ class Trainer:
         log_interval = train_config.get('log_interval', 100)
 
         step = 0
+        self.load_model()
+        # wandb.init(project='qarts', name=self.name)
         for epoch in range(num_epochs):
+            self.save_model(epoch)
             self.model.train()
+            
             for batch in dataloader:
                 X, y, t_idx = batch
                 X = X.to(dtype=self.dtype, device=self.device)
