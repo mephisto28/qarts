@@ -1,12 +1,12 @@
 from .base import FactorSpec
 from .constants import FactorNames
 
-from .deviation import *
-from .momentum import *
-from .volatility import *
-from .high_order import *
+from .impl.deviation import *
+from .impl.momentum import *
+from .impl.volatility import *
+from .impl.high_order import *
 
-from .targets import *
+from .impl.targets import *
 
 from .engine import PipelineFactory, IntradayBatchProcessingEngine, IntradayOnlineProcessingEngine
 from .context import FactorContext, create_mock_context, ContextSrc

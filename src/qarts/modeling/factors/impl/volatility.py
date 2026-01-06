@@ -1,12 +1,12 @@
 import numpy as np
 from numba import njit, prange
 
-from .ops import ContextOps
-from .ops.utils import expand_tdim
-from .context import ContextSrc
-from .constants import FactorNames
-from .base import register_factor, FactorFromDailyAndIntraday
-from . import kernels as kns
+from ..ops import ContextOps
+from ..ops.utils import expand_tdim
+from ..context import ContextSrc
+from ..constants import FactorNames
+from ..base import register_factor, FactorFromDailyAndIntraday
+from .. import kernels as kns
 
 __all__ = [
     'DailyVolatility',

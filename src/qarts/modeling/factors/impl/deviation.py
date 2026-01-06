@@ -2,10 +2,10 @@ import typing as T
 
 import numpy as np
 
-from .ops import ContextOps
-from .context import ContextSrc
-from .constants import FactorNames
-from .base import register_factor, Factor, FactorFromDailyAndIntraday
+from ..ops import ContextOps
+from ..context import ContextSrc
+from ..constants import FactorNames
+from ..base import register_factor, Factor, FactorFromDailyAndIntraday
 
 __all__ = [
     'MAPriceDeviation',

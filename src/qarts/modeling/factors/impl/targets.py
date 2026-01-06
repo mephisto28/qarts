@@ -1,10 +1,10 @@
 import numpy as np
 import numba as nb
 
-from .ops import ContextOps
-from .context import ContextSrc
-from .base import register_factor, FactorFromDailyAndIntraday
-from .constants import FactorNames
+from ..ops import ContextOps
+from ..context import ContextSrc
+from ..base import register_factor, FactorFromDailyAndIntraday
+from ..constants import FactorNames
 
 __all__ = [
     'FutureDayTargets',

@@ -1,9 +1,9 @@
 import numpy as np
 
-from .ops import ContextOps
-from .context import ContextSrc
-from .base import register_factor, FactorFromDailyAndIntraday
-from .constants import FactorNames
+from ..ops import ContextOps
+from ..context import ContextSrc
+from ..base import register_factor, FactorFromDailyAndIntraday
+from ..constants import FactorNames
 
 __all__ = [
     'DailyMomentum',
