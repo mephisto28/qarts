@@ -11,14 +11,15 @@ def encode_instruments(daily_inst: np.ndarray, intra_inst: np.ndarray = None):
     i = pd.Categorical(intra_inst, categories=cats, ordered=True).codes.astype(np.int32)
     return d, i, cats
 
-
+@nb.jit
 def build_ranges(ids_sorted: np.ndarray, n_inst: int):
     start = np.full(n_inst, -1, dtype=np.int64)
     end = np.full(n_inst, -1, dtype=np.int64)
     if ids_sorted.size == 0:
         return start, end
     cur = int(ids_sorted[0])
-    start[cur] = 0
+    if cur >= 0:
+        start[cur] = 0
     for k in range(1, ids_sorted.size):
         x = int(ids_sorted[k])
         if x != cur:
@@ -129,7 +130,9 @@ def densify_features_from_df(
         np.nan,
         out
     )
+
     out = np.ascontiguousarray(np.transpose(out, (2, 0, 1))) # speed up feature access in C-order
+    backward_fill_3d(out, axis=-1)
     return out
 
 
@@ -210,3 +213,32 @@ def densify_fill(
                 for i in range(n_ffill):
                     col_idx = ffill_cols_idx[i]
                     out[b, t, col_idx] = last_vals[i]
+
+
+@nb.njit(parallel=True)
+def _bfill_core_axis0(arr):
+    d0, d1, d2 = arr.shape
+    for j in nb.prange(d1):
+        for k in nb.prange(d2):
+            next_valid = np.nan
+            for i in range(d0 - 1, -1, -1):
+                val = arr[i, j, k]
+                
+                if np.isnan(val):
+                    if not np.isnan(next_valid):
+                        arr[i, j, k] = next_valid
+                else:
+                    next_valid = val
+
+
+def backward_fill_3d(arr, axis=0):
+    if not np.issubdtype(arr.dtype, np.floating):
+        raise ValueError("Input array must be of floating point type supporting NaN.")
+        
+    if axis == 0:
+        arr_view = arr
+    else:
+        arr_view = np.moveaxis(arr, axis, 0)
+    
+    _bfill_core_axis0(arr_view)
+    return arr
