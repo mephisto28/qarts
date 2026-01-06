@@ -145,6 +145,8 @@ def _calc_skewness_kernel(
             term3 = 2 * (mean * mean * mean)
             
             m3 = term1 - term2 + term3
+            if std < 1e-12:
+                out[i, j] = 0 # TODO handle NaN
             out[i, j] = m3 / (std * std * std)
 
 
@@ -220,7 +222,7 @@ def _compute_kurtosis_kernel(
             ssd = s2 - (s1 * s1) / n
             
             if ssd <= 1e-12: # 极小方差保护
-                out[i, t] = np.nan
+                out[i, t] = 0 # TODO handle NaN
                 continue
                 
             # 3. 计算 4阶中心矩 M4

@@ -6,7 +6,6 @@ from loguru import logger
 from qarts.modeling.factors import FactorNames, FactorSpec, ContextSrc
 from qarts.loader import ParquetPanelLoader
 from qarts.modeling.factors.engine import IntradayBatchProcessingEngine, FactorSpec, ContextSrc
-from qarts.modeling.factors.high_order import DailyKurtosis
 from qarts.custom.factor.factor_group import get_factor_group
 
 
