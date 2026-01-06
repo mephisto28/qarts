@@ -132,7 +132,7 @@ def _calc_skewness_kernel(
             var = np.maximum((cur_s2 / cur_n) - (mean * mean), 0.0)
             
             if var < 1e-12:  # 处理极小方差/除零
-                out[i, j] = np.nan
+                out[i, j] = 0 # TODO handle NaN
                 continue
             
             std = np.sqrt(var)
@@ -145,8 +145,6 @@ def _calc_skewness_kernel(
             term3 = 2 * (mean * mean * mean)
             
             m3 = term1 - term2 + term3
-            if std < 1e-12:
-                out[i, j] = 0 # TODO handle NaN
             out[i, j] = m3 / (std * std * std)
 
 
