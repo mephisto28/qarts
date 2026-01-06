@@ -87,12 +87,6 @@ def generate_default_group() -> list[FactorSpec]:
             ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
         }, window=i, params={'shift': 0.0, 'scale': 1})
         factors.append(spec)
-    for i in windows[3:]:
-        spec = FactorSpec(name=FactorNames.DAILY_KURTOSIS, input_fields={
-            ContextSrc.DAILY_QUOTATION: ['alpha'],
-            ContextSrc.INTRADAY_QUOTATION: ['1min_v4_barra4_total']
-        }, window=i, params={'shift': 0.0, 'scale': 0.5})
-        factors.append(spec)
     return factors
 
 

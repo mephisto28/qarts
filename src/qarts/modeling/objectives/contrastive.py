@@ -139,3 +139,85 @@ class MemoryEfficientContrastiveLossForSeq(nn.Module):
                 total_loss = total_loss + (loss_accum / (mask_accum + self.epsilon))
         
         return total_loss / N
+
+
+class MemoryEfficientPairwiseLoss(nn.Module):
+    def __init__(self, chunk_size=64, margin=0.001):
+        super().__init__()
+        self.chunk_size = chunk_size
+        self.margin = margin
+
+    @staticmethod
+    def _chunk_op(p_chunk, p_full, t_chunk, t_full, m_chunk, m_full, start_idx):
+        """
+        Input Shapes: 
+            Chunk: (S, C), Full: (B, C)
+        Returns:
+            masked_loss_sum (Scalar Tensor with grad)
+            valid_count (Scalar Tensor detached)
+        """
+        # 1. 广播计算差异 (S, B, C)
+        p_diff = p_chunk[:, None, :] - p_full[None, :, :]
+        t_diff = t_chunk[:, None, :] - t_full[None, :, :]
+        
+        # 2. 构建上三角掩码 (只保留 j > i)
+        # S: chunk_size, B: batch_size
+        S, B, _ = p_diff.shape
+        curr_rows = torch.arange(start_idx, start_idx + S, device=p_chunk.device)[:, None]
+        all_cols = torch.arange(B, device=p_chunk.device)[None, :]
+        triu_mask = (all_cols > curr_rows).unsqueeze(-1) # (S, B, 1)
+
+        # 3. 合并 Input Mask 和 Triu Mask
+        # (S, 1, C) & (1, B, C) & (S, B, 1) -> (S, B, C)
+        mask_final = m_chunk[:, None, :] & m_full[None, :] & triu_mask
+        
+        # 快速剪枝
+        if not mask_final.any():
+            return p_chunk.sum() * 0.0, torch.tensor(0.0, device=p_chunk.device)
+
+        # 4. 计算 Loss
+        target_gt = (t_diff > 0.001).float() # 使用 self.margin (需传入或硬编码)
+        loss = F.binary_cross_entropy_with_logits(p_diff, target_gt, reduction='none')
+        
+        # 5. Masking
+        masked_loss = loss * mask_final
+        
+        # 返回 Loss Sum (带梯度) 和 Count (无梯度)
+        return masked_loss.sum(), mask_final.float().sum().detach()
+
+    def forward(self, preds, targets, masks = None):
+        """
+        preds, targets, masks: (B, C)
+        """
+        B, C = preds.shape
+        total_loss = 0.0
+        total_count = 0.0
+        
+        # 显式连续化，防止碎片
+        if masks is None:
+            masks = torch.ones_like(preds, dtype=torch.bool)
+        preds, targets, masks = preds.contiguous(), targets.contiguous(), masks.contiguous()
+
+        for start_idx in range(0, B, self.chunk_size):
+            end_idx = min(start_idx + self.chunk_size, B)
+            
+            # Slicing (View operation, no copy)
+            p_chunk = preds[start_idx:end_idx]
+            t_chunk = targets[start_idx:end_idx]
+            m_chunk = masks[start_idx:end_idx]
+
+            # Gradient Checkpointing
+            # 这里的 margin 0.001 硬编码在静态方法里了，若需动态可作为参数传入
+            chunk_loss, chunk_count = checkpoint.checkpoint(
+                self._chunk_op,
+                p_chunk, preds,      # inputs with grad
+                t_chunk, targets,    # no grad
+                m_chunk, masks,      # no grad
+                start_idx,           # scalar
+                use_reentrant=False  # 关键: 防止图构建问题
+            )
+            
+            total_loss = total_loss + chunk_loss
+            total_count = total_count + chunk_count.item()
+
+        return total_loss / (total_count + 1e-8)

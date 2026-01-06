@@ -1,0 +1,65 @@
+
+{
+    "dataset": {
+        "type": "intraday_cs",
+
+        "factor_group": "default",
+        "target_group": "targets_with_costs_10m_3D_with_range",
+        "_target_labels": ["next_10min", "next_30min", "next_60min", "today_close", "next_close", "next_2d_close", "next_3d_close", "next_high", "next_low"],
+        "target_labels": [
+            "next_3d_close", "next_2d_close", "next_close", "close",
+            "next_60min", "next_30min", "next_10min",
+            "next_3d_range", "next_3d_up_range", "next_3d_down_range",
+            "next_2d_range", "next_2d_up_range", "next_2d_down_range",
+            "next_1d_range", "next_1d_up_range", "next_1d_down_range"
+        ],
+
+        "intraday_prefix": "/mnt/nvme02/tdata/training_data/1min_v4__pca1D_5_total__barra4_total",
+        "daily_path": "/mnt/nvme03/tdata/01_Formatted/01_Daily/ohlca_1D_barra4_alpha.parquet",
+        "file_pattern": "*.parquet",
+        "sample_per_day": 1,
+        "timstep_per_day": 238,
+        "freq": 1,
+        "train_start": "2015-01-01",
+        "train_end": "2023-01-01",
+        "test_start": "2023-01-01",
+        "test_end": "2025-09-24",
+
+        "collate_fn": "sample",
+        "collate_fn_params": {
+            "period": [0, 60],
+            "sample_num": 1
+        }
+    },
+    "model": {
+        "type": "mlp",
+        "params": {
+            "input_dim": 58,
+            "hidden_dim": 512,
+            "output_dim": 16,
+            "num_blocks": 4,
+            "dropout": 0.3,
+            "use_final_norm": true
+        }
+    },
+    "train": {
+        "num_epochs": 5,
+        "loss_fn": "contrastive",
+        "lr": 3e-4,
+        "weight_decay": 0.01,
+        "optimizer": "adamw",
+        "optimizer_params": {
+            "betas": [0.9, 0.999], 
+            "eps": 1e-8
+        },
+        "lr_scheduler": "cosine",
+        "lr_scheduler_params": {
+            "T_0": 8500,
+            "eta_min": 1e-6
+        },
+        "log_interval": 1,
+        "num_workers": 0,
+        "dtype": "fp32",
+        "device": "cuda"
+    }
+}
