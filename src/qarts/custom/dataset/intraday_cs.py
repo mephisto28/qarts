@@ -72,7 +72,7 @@ class IntradayDataset(data.Dataset):
         daily_block.ensure_order('datetime-first')
         daily_block = daily_block.between(start_date=self.start_date, end_date=self.end_date + datetime.timedelta(days=7))
         if 'alpha' in daily_block.data.columns:
-            daily_block.data['alpha'].fillna(daily_block.data['daily_return'], inplace=True)
+            daily_block.data['alpha'] = daily_block.data['alpha'].fillna(daily_block.data['daily_return'])
         return daily_block, daily_fields_require_adjustment
 
     def init_context_with_daily(self, date: pd.Timestamp):
