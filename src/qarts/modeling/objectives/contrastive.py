@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
+from .registry import register_loss_fn
 
 
 class MemoryEfficientContrastiveLossForSeq(nn.Module):
@@ -141,6 +142,7 @@ class MemoryEfficientContrastiveLossForSeq(nn.Module):
         return total_loss / N
 
 
+@register_loss_fn('contrastive')
 class MemoryEfficientPairwiseLoss(nn.Module):
     def __init__(self, chunk_size=64, margin=0.001):
         super().__init__()

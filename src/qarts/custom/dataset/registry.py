@@ -50,7 +50,14 @@ def collate_sample_intraday(batch, period: tuple[int, int], sample_num: int = 1)
     t_idx = np.random.randint(t0, t1, size=N)
     X = X[:, np.arange(N), t_idx].T
     y = y[:, np.arange(N), t_idx].T
-    return torch.tensor(X), torch.tensor(y), torch.tensor(t_idx)
+    return {
+        'features': torch.tensor(X), 
+        'targets': torch.tensor(y), 
+        'timesteps': torch.tensor(t_idx),
+        'instruments': batch['instruments'][is_valid_instruments],    
+        'feature_names': batch['feature_names'],
+        'target_names': batch['target_names']
+    }
 
 
 def get_fill_method(c: str):

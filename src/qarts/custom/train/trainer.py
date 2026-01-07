@@ -8,8 +8,8 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from qarts.modeling.nn import ResidualMLP
-from qarts.modeling.objectives.contrastive import MemoryEfficientPairwiseLoss
 from qarts.custom.dataset import get_dataset, get_collate_fn
+from qarts.modeling.objectives import get_loss_fn, HybridLoss
 
 
 class Trainer:
@@ -74,13 +74,12 @@ class Trainer:
             raise ValueError(f'LR scheduler type {lr_scheduler_type} not supported')
 
     def get_loss_fn(self, train_config: dict):
-        loss_fn_type = train_config['loss_fn']
-        if loss_fn_type == 'mse':
-            return torch.nn.MSELoss()
-        elif loss_fn_type == 'contrastive':
-            return MemoryEfficientPairwiseLoss()
+        loss_fn_type = train_config['objectives']
+        if isinstance(loss_fn_type, list):
+            loss_fn = HybridLoss(schemas=loss_fn_type)
+            return loss_fn
         else:
-            raise ValueError(f'Loss function type {loss_fn_type} not supported')
+            return get_loss_fn(loss_fn_type)
 
     def load_model(self, epoch: int = -1):
         prefix = os.path.join(self.output_dir, 'ckpt')
@@ -131,17 +130,19 @@ class Trainer:
             self.model.train()
             
             for batch in dataloader:
-                X, y, t_idx = batch
-                X = X.to(dtype=self.dtype, device=self.device)
-                y = y.to(dtype=self.dtype, device=self.device)
+                X = batch['features'].to(dtype=self.dtype, device=self.device)
+                y = batch['targets'].to(dtype=self.dtype, device=self.device)
 
                 self.optimizer.zero_grad()
                 preds = self.model(X)
-                loss = loss_fn(preds, y)
+                if isinstance(loss_fn, HybridLoss):
+                    loss_fn.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
+                loss, loss_info = loss_fn(preds, y)
                 loss.backward()
                 self.optimizer.step()
                 self.lr_scheduler.step()
                 if step % log_interval == 0:
-                    logger.info(f"Step {step:05d}(E{epoch}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}")
+                    detailed_loss_info = ', '.join([f'{n}: {v:.4f}' for n, v in loss_info.items()])
+                    logger.info(f"Step {step:05d}(E{epoch}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
 
                 step += 1
