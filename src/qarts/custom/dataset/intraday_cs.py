@@ -83,6 +83,13 @@ class IntradayDataset(data.Dataset):
         daily_block = daily_block.filter_instrument_by_count(min_count=180)
         daily_block = daily_block.between(start_date=start_date, end_date=yesterday)
         daily_block.ensure_order('instrument-first')
+        columns = list(daily_block.data.columns)
+        daily_block = PanelBlockDense.from_indexed_block(
+            daily_block,
+            required_columns=columns,
+            fill_methods=[get_fill_method(c) for c in columns],
+            frequency='1D',
+        )
         context = FactorContext.from_daily_block(daily_block)
         return context
 
@@ -97,7 +104,8 @@ class IntradayDataset(data.Dataset):
             required_columns=columns,
             fill_methods=[get_fill_method(c) for c in columns],
             frequency='1D',
-            inst_cats=history_context.inst_categories
+            inst_cats=history_context.inst_categories,
+            backward_fill=True
         )
         context = FactorContext.from_daily_block(daily_block_future, is_future=True)
         return context
@@ -112,7 +120,8 @@ class IntradayDataset(data.Dataset):
             frequency='1min',
             inst_cats=context.inst_categories,
             is_intraday=True,
-            max_nan_count=100
+            max_nan_count=100,
+            backward_fill=True, # to 
         )
         return intraday_block
 

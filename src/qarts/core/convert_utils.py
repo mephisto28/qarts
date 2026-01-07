@@ -96,7 +96,8 @@ def densify_features_from_df(
     grid_ns: np.ndarray,
     inst_categories: np.ndarray,
     required_columns: list[str], 
-    fill_methods: list[int]
+    fill_methods: list[int], # 0 fill zero, 1 ffill, 2 no fill (nan)
+    backward_fill: bool = False
 ) -> np.ndarray:
     # 1. 准备数据
     # dt = df.index.get_level_values("datetime").to_numpy(dtype="datetime64[ns]")
@@ -132,7 +133,8 @@ def densify_features_from_df(
     )
 
     out = np.ascontiguousarray(np.transpose(out, (2, 0, 1))) # speed up feature access in C-order
-    backward_fill_3d(out, axis=-1)
+    if backward_fill:
+        backward_fill_3d(out, axis=-1)
     return out
 
 

@@ -132,7 +132,8 @@ class IntradayBatchProcessingEngine:
                 frequency='1min',
                 inst_cats=context.inst_categories,
                 is_intraday=True,
-                max_nan_count=100
+                max_nan_count=100,
+                backward_fill=True
             )
             context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
         

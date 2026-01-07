@@ -207,7 +207,8 @@ class PanelBlockDense:
         frequency: str = '1min', 
         inst_cats: np.ndarray = None,
         is_intraday: bool = False,
-        max_nan_count: int = 0
+        max_nan_count: int = 0,
+        backward_fill: bool = False
     ) -> 'PanelBlockDense':
         block.ensure_order('instrument-first')
         if isinstance(block, IntradayPanelBlockIndexed) or is_intraday:
@@ -225,7 +226,7 @@ class PanelBlockDense:
         inst_code = pd.Categorical(inst, categories=inst_cats, ordered=True).codes.astype(np.int32)
         n_inst = len(inst_cats)
         starts, ends = build_ranges(inst_code, n_inst)
-        values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods)
+        values = densify_features_from_df(block.data, starts, ends, grid_ns, inst_cats, required_columns, fill_methods, backward_fill)
         inst_cats = np.array(inst_cats)
         if max_nan_count > 0:
             instrument_nan_counts = np.max(np.sum(np.isnan(values), axis=-1), axis=0)

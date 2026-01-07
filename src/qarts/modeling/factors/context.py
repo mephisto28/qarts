@@ -73,7 +73,7 @@ class FactorContext:
             daily_block = PanelBlockDense.from_indexed_block(
                 daily_block,
                 required_columns=columns,
-                fill_methods=[1 for _ in columns],
+                fill_methods=[2 for c in columns],
                 frequency='1D',
             )
         src = ContextSrc.FUTURE_DAILY_QUOTATION if is_future else ContextSrc.DAILY_QUOTATION

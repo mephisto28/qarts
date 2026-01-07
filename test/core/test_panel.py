@@ -94,6 +94,22 @@ class TestPanelConversion(unittest.TestCase):
         self.assertEqual(vol_view[0, 1], 0.0)    # T1 (Filled 0)
         self.assertEqual(vol_view[0, 2], 1200.0) # T2
 
+    def test_indexed_to_dense_conversion(self):
+        """
+        测试从 Indexed Block 到 Dense Block 的转换，
+        重点验证 'price' (ffill) 和 'volume' (fill 0) 的行为。
+        """
+        # fill_methods: 1 for price, 0 for volume
+        dense_block = PanelBlockDense.from_indexed_block(
+            self.block_indexed,
+            required_columns=['price', 'volume'],
+            fill_methods=[2, 2], 
+            frequency='1D',
+            inst_cats=self.all_instruments
+        )
+        price_view = dense_block.get_view('price')   # Shape: (2, 4) -> (Inst, Time)
+        v = price_view[1, 2]
+        self.assertTrue(np.isnan(v))
 
     def test_instrument_alignment(self):
         """测试当 Instruments 列表不匹配或需要对齐时的行为"""
