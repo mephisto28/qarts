@@ -72,7 +72,7 @@ class HybridEvaluator(nn.Module):
             for metric_name, metric_fn in metric_fns.items():
                 val = metric_fn(p_sub, t_sub)
                 
-                key = f'{name}/{metric_name}'
+                key = f'{name}-{metric_name}'
                 
                 # Handle metrics that return dicts (like stratified returns)
                 if isinstance(val, dict):

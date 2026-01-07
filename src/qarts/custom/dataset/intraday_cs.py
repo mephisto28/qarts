@@ -118,7 +118,7 @@ class IntradayDataset(data.Dataset):
 
     def __getitem__(self, index: int):
         f = self.files[index]
-        logger.debug(f"Loading file {os.path.basename(f)} (index {index})")
+        # logger.debug(f"Loading file {os.path.basename(f)} (index {index})")
         date = pd.Timestamp(os.path.basename(f).split('.')[0])
         context = self.init_context_with_daily(date)
         context_future = self.init_future_context_with_daily(context, date)

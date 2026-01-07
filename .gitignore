@@ -13,4 +13,6 @@ wheels/
 test/playground.py
 
 # experiments outputs
+wandb/
+experiments/config/
 experiments/output/
