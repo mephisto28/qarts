@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from qarts.modeling.nn import ResidualMLP
 from qarts.custom.dataset import get_dataset, get_collate_fn
-from qarts.modeling.objectives import get_loss_fn, HybridLoss
+from qarts.modeling.objectives import get_loss_fn, HybridLoss, HybridEvaluator
 
 
 class Trainer:
@@ -81,6 +81,11 @@ class Trainer:
         else:
             return get_loss_fn(loss_fn_type)
 
+    def get_evaluator(self, train_config: dict):
+        loss_fn_type = train_config['objectives']
+        evaluator = HybridEvaluator(schemas=loss_fn_type)
+        return evaluator
+
     def load_model(self, epoch: int = -1):
         prefix = os.path.join(self.output_dir, 'ckpt')
         os.makedirs(prefix, exist_ok=True)
@@ -118,13 +123,14 @@ class Trainer:
         collate_fn = get_collate_fn(self.dataset_config['collate_fn'], **self.dataset_config['collate_fn_params'])
         dataloader = DataLoader(self.train_dataset, batch_size=1, shuffle=True, num_workers=train_config.get('num_workers', 4), collate_fn=collate_fn)
         loss_fn = self.get_loss_fn(train_config)
-
+        evaluator = self.get_evaluator(train_config)
         num_epochs = train_config['num_epochs']
-        log_interval = train_config.get('log_interval', 100)
+        log_interval = train_config.get('log_interval', 10)
+        eval_interval = train_config.get('eval_interval', 10)
 
         step = 0
         self.load_model()
-        # wandb.init(project='qarts', name=self.name)
+        wandb.init(project='qarts', name=self.name)
         for epoch in range(num_epochs):
             self.save_model(epoch)
             self.model.train()
@@ -137,12 +143,19 @@ class Trainer:
                 preds = self.model(X)
                 if isinstance(loss_fn, HybridLoss):
                     loss_fn.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
+                    evaluator.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
                 loss, loss_info = loss_fn(preds, y)
+                eval_results = evaluator(preds, y)
                 loss.backward()
                 self.optimizer.step()
                 self.lr_scheduler.step()
                 if step % log_interval == 0:
                     detailed_loss_info = ', '.join([f'{n}: {v:.4f}' for n, v in loss_info.items()])
                     logger.info(f"Step {step:05d}(E{epoch}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
+                wandb.log({n: v for n, v in eval_results.items()})
+                if step % eval_interval == 0:
+                    detailed_eval_results = ', '.join([f'{n}: {v:.4f}' for n, v in eval_results.items()])
+                    logger.info(f"Step {step:05d}(E{epoch}), Eval: {detailed_eval_results}")
+
 
                 step += 1

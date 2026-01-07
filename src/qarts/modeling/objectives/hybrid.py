@@ -16,7 +16,13 @@ class HybridLoss(nn.Module):
         if isinstance(schemas[0], dict):
             schemas = [Schema(**schema) for schema in schemas]
         self.schemas = schemas
-        self.loss_fns = {schema.name: get_loss_fn(schema.loss)(**schema.loss_params) for schema in self.schemas}
+        self.loss_fns = {
+            schema.name: {
+                loss['type']: get_loss_fn(loss['type'])(**loss['params'])
+                for loss in schema.loss
+            }
+            for schema in self.schemas
+        }
         self.set_input_specs(input_columns, target_columns)
 
     def set_input_specs(self, input_columns: list[str], target_columns: list[str]):
@@ -38,15 +44,16 @@ class HybridLoss(nn.Module):
         
         for item in self.schemas:
             name = item.name
-            loss_fn = self.loss_fns[name]
+            loss_fns = self.loss_fns[name]
             input_indices = self.input_indices[name]
             output_indices = self.output_indices[name]
-
-            p_sub = preds[..., input_indices]
-            t_sub = targets[..., output_indices]
-            sub_loss = loss_fn(p_sub, t_sub)
-            
-            total_loss += sub_loss * item.weight
-            loss_details[name] = sub_loss.item()
+            for loss_name, loss_fn in loss_fns.items():   
+                p_sub = preds[..., input_indices]
+                t_sub = targets[..., output_indices]
+                sub_loss = loss_fn(p_sub, t_sub)
+                
+                total_loss += sub_loss * item.weight
+                final_name = f'{name}/{loss_name}'
+                loss_details[final_name] = sub_loss.item()
 
         return total_loss, loss_details
