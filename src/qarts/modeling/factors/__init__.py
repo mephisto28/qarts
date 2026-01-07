@@ -5,6 +5,7 @@ from .impl.deviation import *
 from .impl.momentum import *
 from .impl.volatility import *
 from .impl.high_order import *
+from .impl.selection import *
 
 from .impl.targets import *
 

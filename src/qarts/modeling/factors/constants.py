@@ -14,6 +14,11 @@ class FactorNames:
     DAILY_KURTOSIS = 'daily_kurtosis'
 
     INTRADAY_MOM = 'intraday_mom'
+    IS_UP_LIMIT = 'is_up_limit'
+    IS_DOWN_LIMIT = 'is_down_limit'
+
+    # selction
+    DAILY_RECENT_VACANCY = 'daily_recent_vacancy'
 
     # targets
     FUTURE_DAY_TARGETS = 'future_day_targets'

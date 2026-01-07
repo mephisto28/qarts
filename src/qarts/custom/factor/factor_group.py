@@ -90,6 +90,20 @@ def generate_default_group() -> list[FactorSpec]:
     return factors
 
 
+@register_factor_group('filters')
+def generate_filter_factors_group() -> list[FactorSpec]:
+    factors = [FactorSpec(name=FactorNames.IS_UP_LIMIT, input_fields={
+        ContextSrc.DAILY_QUOTATION: ['adjusted_close'],
+        ContextSrc.INTRADAY_QUOTATION: ['bid_price1', 'ask_volume1', 'bid_volume1']
+    }, window=1)]
+    for i in [1, 3, 5]:
+        spec = FactorSpec(name=FactorNames.DAILY_RECENT_VACANCY, input_fields={
+            ContextSrc.DAILY_QUOTATION: ['adjusted_close'],
+        }, window=i)
+        factors.append(spec)
+    return factors
+
+
 @register_factor_group('targets_with_costs_10m_3D_with_range')
 def generate_targets_with_costs_10m_3D_group() -> list[FactorSpec]:
     factors = []
