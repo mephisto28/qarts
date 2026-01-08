@@ -5,6 +5,7 @@ from ..ops import ContextOps
 from ..context import ContextSrc
 from ..base import register_factor, FactorFromDailyAndIntraday
 from ..constants import FactorNames
+from .. import kernels as kns
 
 __all__ = [
     'FutureDayTargets',
@@ -124,6 +125,22 @@ class TodayTargets(FactorFromDailyAndIntraday):
         compute_targets(buy_price, sell_price, mid_price, out, self.window)
         # out[:] *= 15 # sqrt(240)
         # out[:] /= np.sqrt(self.window)
+
+
+@register_factor(FactorNames.RANK_TARGETS)
+class RankTargets(FactorFromDailyAndIntraday):
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.target_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+    
+    @property
+    def name(self) -> str:
+        return f'rank_{self.target_field}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        target = ops.now(self.target_field) # N, T
+        kns.fast_binned_percentile_2d(target.T, n_bins=4000, sigma_clip=5.0, out=out.T)
 
 
 @nb.jit

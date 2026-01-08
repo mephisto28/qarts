@@ -27,4 +27,5 @@ class FactorNames:
     FUTURE_DAY_RANGE_TARGETS = 'future_day_range_targets'
     FUTURE_DAY_UP_RANGE_TARGETS = 'future_day_up_range_targets'
     FUTURE_DAY_DOWN_RANGE_TARGETS = 'future_day_down_range_targets'
+    RANK_TARGETS = 'rank_targets'
     

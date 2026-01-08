@@ -42,7 +42,7 @@ def reverse_cumsum_2d(a: np.ndarray, out: np.ndarray):
 
 
 @nb.njit(parallel=True, fastmath=True)
-def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.0):
+def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.0, out: np.ndarray = None):
     """
     将 2D 数组（沿最后一维）的值转换为近似的 Percentile (0~1)。
     使用分桶 + 线性插值的方法，比 argsort 快很多。
@@ -65,7 +65,8 @@ def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.0):
         范围在 [0, 1] 之间的 percentile rank。
     """
     rows, cols = arr.shape
-    out = np.empty_like(arr)
+    if out is None:
+        out = np.empty_like(arr)
     
     # 并行处理每一行
     for i in nb.prange(rows):

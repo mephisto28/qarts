@@ -135,3 +135,28 @@ def generate_targets_with_costs_10m_3D_group() -> list[FactorSpec]:
         }, window=i)
         factors.append(spec)
     return factors
+
+
+@register_factor_group('targets_with_costs_10m_3D_with_rank')
+def generate_targets_with_costs_10m_3D_group() -> list[FactorSpec]:
+    factors = []
+    for i in [3, 2, 1, 0]:
+        spec = FactorSpec(name=FactorNames.FUTURE_DAY_TARGETS, input_fields={
+            ContextSrc.FUTURE_DAILY_QUOTATION: ['adjusted_close'],
+            ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
+        spec = FactorSpec(name=FactorNames.RANK_TARGETS, input_fields={
+            ContextSrc.FACTOR_CACHE: [f'{spec.name}_{i}']
+        }, window=i)
+        factors.append(spec)
+    for i in [60, 30, 10]:
+        spec = FactorSpec(name=FactorNames.TODAY_TARGETS, input_fields={
+            ContextSrc.INTRADAY_QUOTATION: ['ask_price1', 'bid_price1', 'mid_price']
+        }, window=i)
+        factors.append(spec)
+        spec = FactorSpec(name=FactorNames.RANK_TARGETS, input_fields={
+            ContextSrc.FACTOR_CACHE: [f'{spec.name}_{i}']
+        }, window=i)
+        factors.append(spec)
+    return factors
