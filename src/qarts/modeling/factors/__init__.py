@@ -9,6 +9,6 @@ from .impl.selection import *
 
 from .impl.targets import *
 
-from .engine import PipelineFactory, IntradayBatchProcessingEngine, IntradayOnlineProcessingEngine
+from .pipeline import PipelineFactory, IntradayBatchProcessingEngine, FactorsProcessor
 from .context import FactorContext, create_mock_context, ContextSrc
 from .ops import ContextOps

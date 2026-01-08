@@ -9,7 +9,7 @@ from qarts.core import FactorPanelBlockDense, IntradayPanelBlockDense, DailyPane
 from qarts.core.panel import PanelBlockDense
 from qarts.utils.profiler import TimerProfiler
 from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
-from .base import FactorSpec, get_factor
+from .base import Factor, FactorSpec, get_factor
 from .context import ContextSrc, FactorContext
 from .ops import ContextOps
 
@@ -25,32 +25,52 @@ class PipelineFactory:
         self.input_fields = {src: list(fields) for src, fields in input_fields.items()}
 
     def create_batch_pipeline(self, src: ContextSrc) -> T.Callable:
-        def pipeline(context: FactorContext) -> FactorPanelBlockDense:
-            factors_block = FactorPanelBlockDense.init_empty_from_context(
-                context.inst_categories,
-                timestamps=context.blocks[src].timestamps,
-                fields=[f.name for f in self.factors],
-                freq=context.blocks[src].frequency
-            )
-            context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
-            context_ops = ContextOps(context, is_online=False)
-            for i, factor in enumerate(self.factors):
-                placeholder = factors_block.data[i]
-                factor.compute_from_context(context_ops, placeholder)
-            for i, factor in enumerate(self.factors):
-                value = factors_block.data[i]
-                value -= factor.shift
-                value *= factor.scale
-            return factors_block
+        return FactorsProcessor(self.factors, src, is_online=False)
 
-        return pipeline
-
-    def create_online_engine(self) -> T.Callable:
-        pass
+    def create_online_engine(self, src: ContextSrc) -> T.Callable:
+        return FactorsProcessor(self.factors, src, is_online=True)
 
 
-class IntradayOnlineProcessingEngine:
-    pass # TODO
+class FactorsProcessor:
+    def __init__(
+        self, 
+        factors: list[Factor], 
+        src: ContextSrc = ContextSrc.INTRADAY_QUOTATION,
+        is_online: bool = False
+    ):
+        self.factors = factors
+        self.src = src
+        self.is_online = is_online
+
+    def process_batch(self, context: FactorContext) -> FactorPanelBlockDense:
+        factors_block = FactorPanelBlockDense.init_empty_from_context(
+            context.inst_categories,
+            timestamps=context.blocks[self.src].timestamps,
+            fields=[f.name for f in self.factors],
+            freq=context.blocks[self.src].frequency
+        )
+        factors_block.is_valid_instruments = context.blocks[self.src].is_valid_instruments
+        context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
+
+        context_ops = ContextOps(context, is_online=False)
+        for i, factor in enumerate(self.factors):
+            placeholder = factors_block.data[i]
+            factor.compute_from_context(context_ops, placeholder)
+        for i, factor in enumerate(self.factors):
+            value = factors_block.data[i]
+            value -= factor.shift
+            value *= factor.scale
+        return factors_block
+
+    def process_online(self, context: FactorContext) -> FactorPanelBlockDense:
+        # TODO
+        raise NotImplementedError
+
+    def __call__(self, context: FactorContext) -> FactorPanelBlockDense:
+        if self.is_online:
+            return self.process_online(context)
+        else:
+            return self.process_batch(context)
 
 
 
@@ -137,27 +157,9 @@ class IntradayBatchProcessingEngine:
             )
             context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
         
-        # factor_compute = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
-        # factors_block = factor_compute(context)
-        with self.profiler.section('factor_init'):
-            factors_block = FactorPanelBlockDense.init_empty_from_context(
-                context.inst_categories,
-                timestamps=context.blocks[ContextSrc.INTRADAY_QUOTATION].timestamps,
-                fields=[f.name for f in self.factors],
-                freq=context.blocks[ContextSrc.INTRADAY_QUOTATION].frequency
-            )
-            factors_block.is_valid_instruments = context.blocks[ContextSrc.INTRADAY_QUOTATION].is_valid_instruments
-            context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
-
         with self.profiler.section('factor_compute'):
-            context_ops = ContextOps(context, is_online=False)
-            for i, factor in enumerate(self.factors):
-                placeholder = factors_block.data[i]
-                factor.compute_from_context(context_ops, placeholder)
-            for i, factor in enumerate(self.factors):
-                value = factors_block.data[i]
-                value -= factor.shift
-                value *= factor.scale
+            factor_processor = self.factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
+            factors_block = factor_processor(context)
         return factors_block
 
     def iterate_tasks(self) -> T.Generator[tuple[datetime.date, FactorPanelBlockDense], None, None]:
