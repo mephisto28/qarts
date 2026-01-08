@@ -8,7 +8,7 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from qarts.modeling.nn import ResidualMLP
-from qarts.custom.dataset import get_dataset, get_collate_fn
+from qarts.custom.dataset import get_dataset, get_collate_fn, CrossBatchDataLoader
 from qarts.modeling.objectives import get_loss_fn, HybridLoss, HybridEvaluator
 
 
@@ -121,7 +121,22 @@ class Trainer:
     def train(self):
         train_config = self.train_config
         collate_fn = get_collate_fn(self.dataset_config['collate_fn'], **self.dataset_config['collate_fn_params'])
-        dataloader = DataLoader(self.train_dataset, batch_size=1, shuffle=True, num_workers=train_config.get('num_workers', 4), collate_fn=collate_fn)
+        if train_config.get('use_shuffle_buffer', False):
+            dataloader = CrossBatchDataLoader(
+                self.train_dataset, 
+                batch_size=train_config.get('batch_size', 2048), 
+                num_workers=train_config.get('num_workers', 4), 
+                buffer_batch_count=train_config.get('buffer_count', 50),
+                collate_fn=collate_fn
+            )
+        else:
+            dataloader = DataLoader(
+                self.train_dataset, 
+                batch_size=1, 
+                shuffle=True, 
+                num_workers=train_config.get('num_workers', 4), 
+                collate_fn=collate_fn
+            )
         loss_fn = self.get_loss_fn(train_config)
         evaluator = self.get_evaluator(train_config)
         num_epochs = train_config['num_epochs']
