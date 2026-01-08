@@ -109,7 +109,9 @@ class DailyOps(BaseOps):
         volume_prefix_sum = self.history_pow_cumsum(volume_field, power=1)
         weighted_sum = weighted_prefix_sum[:, -window]
         normalizer = volume_prefix_sum[:, -window]
-        return (weighted_sum / normalizer).astype(np.float32)
+        vwap = (weighted_sum / (normalizer + 1e-6)).astype(np.float32)
+        vwap = np.where(normalizer == 0, self.history_window_ma(price_field, window=window)[:, 0], vwap)
+        return vwap
 
     @expand_tdim
     def history_window_high(self, field: str, name: str = 'history_high', window: int = 20) -> np.ndarray:
