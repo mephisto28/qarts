@@ -105,7 +105,7 @@ def generate_factor_specs():
 class TestFactorEngine(unittest.TestCase):
 
     def test_features_smoketest(self):
-        factors = get_factor_group('default') + get_factor_group('targets_with_costs_10m_3D_with_range') + get_factor_group('filters')
+        factors = get_factor_group('default') + get_factor_group('targets_with_costs_10m_3D_with_rank') + get_factor_group('filters')
         loader = ParquetPanelLoader()
         engine = IntradayBatchProcessingEngine(loader, factors)
         desc_msgs = []

@@ -41,8 +41,8 @@ def reverse_cumsum_2d(a: np.ndarray, out: np.ndarray):
     return out
 
 
-@nb.njit(parallel=True, fastmath=True)
-def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.0, out: np.ndarray = None):
+@nb.njit(parallel=True)
+def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.5, out: np.ndarray = None):
     """
     将 2D 数组（沿最后一维）的值转换为近似的 Percentile (0~1)。
     使用分桶 + 线性插值的方法，比 argsort 快很多。
@@ -71,24 +71,27 @@ def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.0, out: np.ndarray 
     # 并行处理每一行
     for i in nb.prange(rows):
         row_data = arr[i, :]
-        
-        # 1. 快速计算统计量以确定分桶范围 (O(N))
-        # 这里为了速度，不使用 np.nanmean 等，假设数据无 NaN
-        # 如果有 NaN，需要先填充
+
         mean_val = 0.0
+        _n = 0
         for j in range(cols):
-            mean_val += row_data[j]
-        mean_val /= cols
+            val = row_data[j]
+            if val == val:
+                _n += 1
+                mean_val += val
+        mean_val /= _n
         
         var_val = 0.0
+        _n = 0
         for j in range(cols):
-            d = row_data[j] - mean_val
-            var_val += d * d
-        std_val = np.sqrt(var_val / cols)
+            val = row_data[j]
+            if val == val:
+                _n += 1
+                d = val - mean_val
+                var_val += d * d
+        std_val = np.sqrt(var_val / (_n - 1))
         
-        # 确定 Winsorize 的边界
-        # 只有在这个范围内的数据会被精细分桶
-        # 极值将被压缩到 0 或 1
+        # 确定 Winsorize 的边界, 只有在这个范围内的数据会被精细分桶, 极值将被压缩到 0 或 1
         low_limit = mean_val - sigma_clip * std_val
         high_limit = mean_val + sigma_clip * std_val
         

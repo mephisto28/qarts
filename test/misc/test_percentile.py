@@ -13,6 +13,15 @@ class TestBinnedPercentile(unittest.TestCase):
         self.n_rows = 50
         self.n_cols = 4000
         self.data = np.random.standard_t(df=3, size=(self.n_rows, self.n_cols))
+
+    def test_sample(self):
+        a = np.array([np.arange(50), np.arange(50, 0, -1)]).astype(np.float32)
+        a[0, 0] = np.nan
+        a[1, 1] = np.nan
+        result = fast_binned_percentile_2d(a, n_bins=1000, sigma_clip=3.5)
+        self.assertTrue(np.isnan(result[0, 0]))
+        self.assertTrue(np.isnan(result[1, 1]))
+        self.assertTrue(~np.isnan(result[0, 1]))
         
     def test_accuracy_vs_scipy(self):
         """测试近似 Rank 与 Scipy 真实 Rank 的一致性"""

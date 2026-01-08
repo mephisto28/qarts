@@ -140,7 +140,7 @@ class RankTargets(FactorFromDailyAndIntraday):
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         target = ops.now(self.target_field) # N, T
-        kns.fast_binned_percentile_2d(target.T, n_bins=4000, sigma_clip=5.0, out=out.T)
+        kns.fast_binned_percentile_2d(target.T, n_bins=2000, sigma_clip=3.5, out=out.T)
 
 
 @nb.jit
