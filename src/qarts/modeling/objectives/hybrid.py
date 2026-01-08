@@ -28,15 +28,15 @@ class HybridLoss(nn.Module):
     def set_input_specs(self, input_columns: list[str], target_columns: list[str]):
         if input_columns is None or target_columns is None:
             return
-        if getattr(self, 'input_indices', None) is None:
+        if getattr(self, 'pred_indices', None) is None:
             self.input_columns = input_columns
             self.output_columns = target_columns
-            self.input_indices = {schema.name: [input_columns.index(f) for f in schema.fields] for schema in self.schemas}
-            self.output_indices = {schema.name: [target_columns.index(f) for f in schema.fields] for schema in self.schemas}
+            self.pred_indices = {schema.name: schema.pred_indices for schema in self.schemas}
+            self.target_indices = {schema.name: [target_columns.index(f) for f in schema.target_fields] for schema in self.schemas}
             logger.info(f"Input specifications set: {self.input_columns}, {self.output_columns}")
 
     def forward(self, preds, targets):
-        if self.input_indices is None:
+        if self.pred_indices is None:
             raise ValueError("Input specifications not set, call set_input_specs for hybrid loss to work")
             
         total_loss = 0.0
@@ -45,13 +45,13 @@ class HybridLoss(nn.Module):
         for item in self.schemas:
             name = item.name
             loss_fns = self.loss_fns[name]
-            input_indices = self.input_indices[name]
-            output_indices = self.output_indices[name]
+            input_indices = self.pred_indices[name]
+            target_indices = self.target_indices[name]
+            p_sub = preds[..., input_indices]
+            t_sub = targets[..., target_indices]
+
             for loss_name, loss_fn in loss_fns.items():   
-                p_sub = preds[..., input_indices]
-                t_sub = targets[..., output_indices]
                 sub_loss = loss_fn(p_sub, t_sub)
-                
                 total_loss += sub_loss * item.weight
                 final_name = f'{name}/{loss_name}'
                 loss_details[final_name] = sub_loss.item()

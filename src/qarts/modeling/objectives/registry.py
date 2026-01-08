@@ -15,10 +15,14 @@ _metrics = {}
 @dataclass
 class Schema:
     name: str
-    fields: list[str]
+    pred_indices: list[int]
+    target_fields: list[str]
     weight: float
     loss: list[dict]
     metrics: list[dict]
+
+    def __post_init__(self):
+        assert len(self.pred_indices) == len(self.target_fields), "Number of pred indices and target fields must match"
 
 
 def register_loss_fn(name: str):
