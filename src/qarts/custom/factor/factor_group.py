@@ -92,7 +92,7 @@ def generate_default_group() -> list[FactorSpec]:
 
 @register_factor_group('filters')
 def generate_filter_factors_group() -> list[FactorSpec]:
-    factors = [FactorSpec(name=FactorNames.IS_UP_LIMIT, input_fields={
+    factors = [FactorSpec(name=FactorNames.IS_TRADABLE, input_fields={
         ContextSrc.DAILY_QUOTATION: ['adjusted_close'],
         ContextSrc.INTRADAY_QUOTATION: ['bid_price1', 'ask_volume1', 'bid_volume1']
     }, window=1)]

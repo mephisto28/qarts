@@ -17,8 +17,9 @@ __all__ = [
 class DailyRecentVacancy(FactorFromDailyAndIntraday):
     num_daily_fields = 1
 
-    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, threshold: float = 0.8, **kwargs):
         super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.threshold = threshold
         self.history_price_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
 
     @property
@@ -31,9 +32,33 @@ class DailyRecentVacancy(FactorFromDailyAndIntraday):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         history_values = ops.history_pow_cumsum(self.history_price_field, power=0)
         valid_count = history_values[:, -self.window]
-        out[:] = valid_count[:, None] / self.window
+        out[:] = (valid_count[:, None] / self.window) > self.threshold
         # breakpoint()
 
+
+@register_factor(FactorNames.IS_TRADABLE)
+class IsTradable(FactorFromDailyAndIntraday):
+    num_daily_fields = 1
+    num_intraday_fields = 3
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.history_price_field = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
+        self.bid_p1_field, self.ask_v1_field , self.bid_v1_field = \
+            self.input_fields[ContextSrc.INTRADAY_QUOTATION]
+
+    @property
+    def name(self) -> str:
+        return f'{FactorNames.IS_TRADABLE}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        bid1_price = ops.now(self.bid_p1_field)
+        ask1_volume = ops.now(self.ask_v1_field)
+        bid1_volume = ops.now(self.bid_v1_field)
+        yest_price = ops.yesterday(self.history_price_field)
+        is_up_limit(bid1_price, ask1_volume, bid1_volume, yest_price, out)
+        out[:] = 1 - out[:]
+        
 
 @register_factor(FactorNames.IS_UP_LIMIT)
 class IsUpLimit(FactorFromDailyAndIntraday):

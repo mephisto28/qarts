@@ -16,6 +16,7 @@ class FactorNames:
     INTRADAY_MOM = 'intraday_mom'
     IS_UP_LIMIT = 'is_up_limit'
     IS_DOWN_LIMIT = 'is_down_limit'
+    IS_TRADABLE = 'is_tradable'
 
     # selction
     DAILY_RECENT_VACANCY = 'daily_recent_vacancy'

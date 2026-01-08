@@ -50,6 +50,12 @@ def collate_sample_intraday(batch, period: tuple[int, int], sample_num: int = 1)
     t_idx = np.random.randint(t0, t1, size=N)
     X = X[:, np.arange(N), t_idx].T
     y = y[:, np.arange(N), t_idx].T
+    if 'selector' in batch:
+        selector = batch['selector']
+        selector = selector[is_valid_instruments]
+        selector = selector[np.arange(N), t_idx]
+        X = X[selector]
+        y = y[selector]
     return {
         'features': torch.tensor(X), 
         'targets': torch.tensor(y), 

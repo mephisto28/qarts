@@ -138,6 +138,7 @@ class Trainer:
             for batch in dataloader:
                 X = batch['features'].to(dtype=self.dtype, device=self.device)
                 y = batch['targets'].to(dtype=self.dtype, device=self.device)
+                B = X.shape[0]
 
                 self.optimizer.zero_grad()
                 preds = self.model(X)
@@ -151,7 +152,7 @@ class Trainer:
                 self.lr_scheduler.step()
                 if step % log_interval == 0:
                     detailed_loss_info = ', '.join([f'{n}: {v:.4f}' for n, v in loss_info.items()])
-                    logger.info(f"Step {step:05d}(E{epoch}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
+                    logger.info(f"Step {step:05d}(E{epoch}) (B{B}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
                 wandb.log({n: v for n, v in eval_results.items()})
                 if step % eval_interval == 0:
                     detailed_eval_results = ', '.join([f'{n}: {v:.4f}' for n, v in eval_results.items()])
