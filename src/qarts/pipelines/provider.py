@@ -18,6 +18,8 @@ class DailyAndIntradayProvider(Processor):
         loader: PanelLoader, 
         daily_fields: list[str], 
         intraday_fields: list[str],
+        start_date: datetime.date | str = None,
+        end_date: datetime.date | str = None,
         target_specs: list[VariableLoadSpec] = [],
         return_factor_context: bool = False
     ):
@@ -26,6 +28,8 @@ class DailyAndIntradayProvider(Processor):
         if 'factor' not in self.daily_fields:
             self.daily_fields.append('factor')
         self.intraday_fields = intraday_fields + ['instrument']
+        self.start_date = start_date    
+        self.end_date = end_date
         self.target_specs = target_specs
         self.return_factor_context = return_factor_context
         self.daily_manager = DailyDataManager(loader, daily_fields, recent_days=-1) # load all daily data
@@ -33,6 +37,7 @@ class DailyAndIntradayProvider(Processor):
     def generate_tasks(self) -> T.Generator[tuple[datetime.datetime, T.Any], None, None]:
         load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={})
         available_dates = self.loader.list_available_dates([load_spec])
+        available_dates = [date for date in available_dates if (date >= self.start_date or self.start_date is None) and (date <= self.end_date or self.end_date is None)]
         existing_dates = self.loader.list_available_dates(self.target_specs)
         required_dates = sorted(set(available_dates) - set(existing_dates))
 
