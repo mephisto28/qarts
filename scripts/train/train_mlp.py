@@ -25,7 +25,7 @@ def set_seed(seed=42):
 def main(exp_name: str):
     set_seed(42)
     d = os.path.dirname
-    project_dir = d(d(os.path.abspath(__file__)))
+    project_dir = d(d(d(os.path.abspath(__file__))))
     config_path = os.path.join(project_dir, 'experiments', 'config', f'{exp_name}.json')
     config = json.load(open(config_path))
     trainer = Trainer(config=config, name=exp_name)
