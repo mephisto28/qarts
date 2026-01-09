@@ -50,6 +50,18 @@ class BatchProcessPipeline:
     def register_tasks(self, task_generator: T.Callable[[], T.Generator[tuple[datetime.datetime, T.Any], None, None]]):
         self.task_generator = task_generator
 
+    def get_processor(self, name: str) -> Processor:
+        for processor in self.processors:
+            if processor.name == name:
+                return processor
+        raise ValueError(f"Processor {name} not found")
+
+    def get_processor_by_type(self, type: T.Type[Processor]) -> Processor:
+        for processor in self.processors:
+            if isinstance(processor, type):
+                return processor
+        raise ValueError(f"Processor of type {type} not found")
+
     def run(self, *args, **kwargs) -> T.Any:
         for dt, task in self.task_generator():
             self.context.set_datetime(dt)

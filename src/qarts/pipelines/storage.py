@@ -23,4 +23,5 @@ class DataStoreProcessor(Processor):
             'factor': self.output_name, 
             'date': date.date(),
         })
+        logger.info(f'Saving {self.output_name} on {date.date()} with {data.data.shape}')
         self.loader.save_intraday(data, save_spec)
