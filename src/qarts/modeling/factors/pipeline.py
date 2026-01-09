@@ -25,22 +25,40 @@ class PipelineFactory:
         self.input_fields = {src: list(fields) for src, fields in input_fields.items()}
 
     def create_batch_pipeline(self, src: ContextSrc) -> T.Callable:
-        return FactorsProcessor(self.factors, src, is_online=False)
+        return FactorsProcessor(
+            factors=self.factors, 
+            input_fields=self.input_fields,
+            src=src, is_online=False,
+        )
 
     def create_online_engine(self, src: ContextSrc) -> T.Callable:
-        return FactorsProcessor(self.factors, src, is_online=True)
+        return FactorsProcessor(
+            factors=self.factors,
+            input_fields=self.input_fields,
+            src=src, is_online=True
+        )
 
 
 class FactorsProcessor:
     def __init__(
         self, 
         factors: list[Factor], 
+        input_fields: dict[str, list[str]],
         src: ContextSrc = ContextSrc.INTRADAY_QUOTATION,
         is_online: bool = False
     ):
         self.factors = factors
+        self.input_fields = input_fields
         self.src = src
         self.is_online = is_online
+
+    def get_daily_fields(self) -> list[str]:
+        required_daily_fields = self.input_fields[ContextSrc.DAILY_QUOTATION]
+        required_daily_fields_before_adjustment = list(set([field.replace('adjusted_', '') for field in required_daily_fields]))
+        return required_daily_fields_before_adjustment
+
+    def get_intraday_fields(self) -> list[str]:
+        return self.input_fields[ContextSrc.INTRADAY_QUOTATION]
 
     def process_batch(self, context: FactorContext) -> FactorPanelBlockDense:
         factors_block = FactorPanelBlockDense.init_empty_from_context(

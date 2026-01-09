@@ -73,7 +73,7 @@ class FactorContext:
             daily_block = PanelBlockDense.from_indexed_block(
                 daily_block,
                 required_columns=columns,
-                fill_methods=[2 for c in columns],
+                fill_methods=[get_fill_method(c) for c in columns],
                 frequency='1D',
             )
         src = ContextSrc.FUTURE_DAILY_QUOTATION if is_future else ContextSrc.DAILY_QUOTATION
@@ -131,3 +131,11 @@ def create_mock_context(size=10, seed=42):
     context.register_block(ContextSrc.INTRADAY_QUOTATION, intraday_block)
     context.register_block(ContextSrc.FACTOR_CACHE, factor_cache_block)
     return context
+
+
+def get_fill_method(c: str):
+    if c in ('volume', 'turnover', 'amount', 'daily_return'):
+        return 0
+    elif c.endswith('diff'):
+        return 0
+    return 1
