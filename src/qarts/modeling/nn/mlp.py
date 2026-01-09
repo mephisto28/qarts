@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-import random
+from .registery import register_model
 
 
 class SwiGLU(nn.Module):
@@ -73,6 +72,7 @@ class ResidualMLPBlock(nn.Module):
             return residual + out
 
 
+@register_model('mlp')
 class ResidualMLP(nn.Module):
     def __init__(
         self,
