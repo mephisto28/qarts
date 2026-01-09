@@ -44,6 +44,9 @@ class ParquetPanelLoader(PanelLoader):
             specs = [specs]
             return self.list_available_dates(specs)
 
+        if len(specs) == 0:
+            return []
+
         available_files = None
         for spec in specs:
             dir = self.get_dir(spec.var_type, **spec.load_kwargs)
@@ -52,7 +55,7 @@ class ParquetPanelLoader(PanelLoader):
 
             files = os.listdir(dir)
             available_files = set(files) if available_files is None else available_files.intersection(files)
-
+        
         filenames = [os.path.basename(f) for f in available_files if f.endswith('.parquet')]
         available_dates = [
             datetime.datetime.strptime(f.split('.')[0], self.date_format).date()
