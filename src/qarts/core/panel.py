@@ -123,6 +123,11 @@ class PanelBlockIndexed(PanelDataIndexed):
         df = pd.DataFrame({s.field: s.data for s in s_list})
         return cls.from_dataframe(df, src=names)
 
+    @classmethod
+    def from_dense_block(cls, block: 'PanelBlockDense') -> 'PanelBlockIndexed':
+        df = block.to_dataframe()
+        return cls.from_dataframe(df)
+
 
 @dataclass
 class PanelBlockDense:
@@ -180,6 +185,8 @@ class PanelBlockDense:
         if instrument is not None:
             data = self.data[instrument].T
             index = self.timestamps
+        elif self.cursor < 0:
+            return self.to_dataframe()
         else:
             cursor = self.cursor
             if timestamp is not None:
@@ -187,6 +194,19 @@ class PanelBlockDense:
             data = self.data[..., cursor].T
             index = self.instruments
         return pd.DataFrame(data, index=index, columns=self.fields)
+
+    def to_dataframe(self) -> pd.DataFrame:
+        if self.is_valid_instruments is not None:
+            data = self.data[:, self.is_valid_instruments]
+            instruments = self.instruments[self.is_valid_instruments]
+        else:
+            data = self.data
+            instruments = self.instruments
+        F, N, T = data.shape
+        data_2d = np.transpose(data, (2, 1, 0)).reshape(T * N, F)
+        index = pd.MultiIndex.from_product([self.timestamps, instruments], names=['datetime', 'instrument'])
+        columns = self.fields
+        return pd.DataFrame(data_2d, index=index, columns=columns)
 
     @classmethod
     def init_empty_from_context(cls, instruments: np.ndarray, timestamps: np.ndarray, fields: list[str], freq: str) -> 'PanelBlockDense':

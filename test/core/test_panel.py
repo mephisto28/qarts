@@ -127,5 +127,29 @@ class TestPanelConversion(unittest.TestCase):
         self.assertEqual(dense_block.data.shape, (1, 1, 5))
         self.assertEqual(dense_block.instruments[0], 'InstA')
 
+    def test_dense_to_indexed_conversion(self):
+        dense_block = PanelBlockDense.from_indexed_block(
+            self.block_indexed,
+            required_columns=['price', 'volume'],
+            fill_methods=[1],
+            inst_cats=self.all_instruments
+        )
+        indexed_block = PanelBlockIndexed.from_dense_block(dense_block)
+        self.assertEqual(indexed_block.data.shape, (15, 2))
+        self.assertListEqual(list(indexed_block.data.index.names), ['datetime', 'instrument'])
+        self.assertListEqual(list(indexed_block.data.columns), ['price', 'volume'])
+        self.assertEqual(indexed_block.data.loc[('2023-01-01', 'InstA')]['price'], 100.0)
+        self.assertEqual(indexed_block.data.loc[('2023-01-01', 'InstA')]['volume'], 1000)
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstA')]['price'], 104.0)
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstA')]['volume'], 1400)
+        self.assertEqual(indexed_block.data.loc[('2023-01-01', 'InstB')]['price'], 200.0)
+        self.assertEqual(indexed_block.data.loc[('2023-01-01', 'InstB')]['volume'], 2000)
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstB')]['price'], 204.0)
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstB')]['volume'], 2400)
+        self.assertTrue(np.isnan(indexed_block.data.loc[('2023-01-01', 'InstC')]['price']))
+        self.assertTrue(np.isnan(indexed_block.data.loc[('2023-01-01', 'InstC')]['volume']))
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstC')]['price'], 304.0)
+        self.assertEqual(indexed_block.data.loc[('2023-01-05', 'InstC')]['volume'], 3400)
+
 if __name__ == '__main__':
     unittest.main()
