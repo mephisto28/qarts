@@ -52,10 +52,13 @@ class FactorsProcessor:
         self.src = src
         self.is_online = is_online
 
-    def get_daily_fields(self) -> list[str]:
-        required_daily_fields = self.input_fields[ContextSrc.DAILY_QUOTATION]
+    def get_daily_fields_before_adjustment(self) -> list[str]:
+        required_daily_fields = self.get_daily_fields()
         required_daily_fields_before_adjustment = list(set([field.replace('adjusted_', '') for field in required_daily_fields]))
         return required_daily_fields_before_adjustment
+
+    def get_daily_fields(self) -> list[str]:
+        return list(set(self.input_fields[ContextSrc.DAILY_QUOTATION] + self.input_fields.get(ContextSrc.FUTURE_DAILY_QUOTATION, [])))
 
     def get_intraday_fields(self) -> list[str]:
         return self.input_fields[ContextSrc.INTRADAY_QUOTATION]

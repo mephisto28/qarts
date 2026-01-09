@@ -22,9 +22,13 @@ class DailyAndIntradayProvider(Processor):
         return_factor_context: bool = False
     ):
         self.loader = loader
-        self.daily_manager = DailyDataManager(loader, daily_fields, recent_days=-1) # load all daily data
+        self.daily_fields = daily_fields + ['instrument']
+        if 'factor' not in self.daily_fields:
+            self.daily_fields.append('factor')
+        self.intraday_fields = intraday_fields + ['instrument']
         self.target_specs = target_specs
         self.return_factor_context = return_factor_context
+        self.daily_manager = DailyDataManager(loader, daily_fields, recent_days=-1) # load all daily data
 
     def generate_tasks(self) -> T.Generator[tuple[datetime.datetime, T.Any], None, None]:
         load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={})
@@ -33,19 +37,19 @@ class DailyAndIntradayProvider(Processor):
         required_dates = sorted(set(available_dates) - set(existing_dates))
 
         for date in required_dates:
-            yield datetime.datetime.combine(date, datetime.time(0, 0, 0))
+            yield datetime.datetime.combine(date, datetime.time(0, 0, 0)), None
 
     def create_factor_context(self, daily_block: PanelBlockIndexed, intraday_block: PanelBlockIndexed) -> FactorContext:
         daily_block = PanelBlockDense.from_indexed_block(
             daily_block,
-            required_columns=daily_block.data.columns,
+            required_columns=list(daily_block.data.columns),
             fill_methods=[get_fill_method(c) for c in daily_block.data.columns],
             frequency='1D'
         )
         context = FactorContext.from_daily_block(daily_block)
         intraday_block = PanelBlockDense.from_indexed_block(
             intraday_block,
-            required_columns=intraday_block.data.columns,
+            required_columns=list(intraday_block.data.columns),
             fill_methods=[get_fill_method(c) for c in intraday_block.data.columns],
             frequency='1min',
             inst_cats=daily_block.instruments,

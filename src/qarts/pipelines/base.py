@@ -24,14 +24,15 @@ class GlobalContext:
         return self.data.get(key, default)
 
     def set(self, key: str, value: T.Any):
-        del self.data[key]
+        if key in self.data:
+            del self.data[key]
         self.data[key] = value
 
     def set_result(self, key: str, value: T.Any):
         if isinstance(value, dict):
             for k, v in value.items():
                 self.set(k, v)
-        else:
+        elif value is not None:
             self.set(key, value)
 
     def set_datetime(self, datetime: datetime.datetime):
@@ -52,8 +53,8 @@ class BatchProcessPipeline:
     def run(self, *args, **kwargs) -> T.Any:
         for dt, task in self.task_generator():
             self.context.set_datetime(dt)
-            self.context.set('task', task)
+            if task is not None:
+                self.context.set('task', task)
             for processor in self.processors:
                 result = processor(self.context)
                 self.context.set_result(processor.name, result)
-

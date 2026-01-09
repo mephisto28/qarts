@@ -7,11 +7,12 @@ from .provider import DailyAndIntradayProvider
 
 
 class FactorsProcessorWrapper(Processor):
-    name: str = 'factor'
+    name: str = 'factors'
 
     def __init__(self, processor: FactorsProcessor):
         self.processor = processor
-        self.daily_fields = self.processor
+        self.daily_fields = self.processor.get_daily_fields()
+        self.intraday_fields = self.processor.get_intraday_fields()
 
     def process(self, context: GlobalContext) -> T.Any:
         factor_context = context.get('factor_context')
@@ -27,11 +28,13 @@ class FactorsProcessorWrapper(Processor):
 
 
 def get_factor_process_pipeline(factor_group_name: str) -> BatchProcessPipeline:
+    from qarts.custom.factor import get_factor_group
     factors_processor = FactorsProcessorWrapper.from_factor_group(factor_group_name)
     provider = DailyAndIntradayProvider(
         loader=ParquetPanelLoader(), 
-        daily_fields=['adjusted_close'], 
-        intraday_fields=['1min_v4_barra4_total']
+        daily_fields=factors_processor.daily_fields, 
+        intraday_fields=factors_processor.intraday_fields,
+        return_factor_context=True
     )
 
     pipeline = BatchProcessPipeline()
