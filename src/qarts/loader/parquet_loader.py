@@ -11,7 +11,7 @@ from .dataloader import PanelLoader, PanelBlockIndexed, VariableLoadSpec
 
 class ParquetPanelLoader(PanelLoader):
     
-    def __init__(self, prefix: str = '/', config: T.Optional[dict] = None):
+    def __init__(self, prefix: str = '/', config: T.Optional[dict] = None, compression: str = 'zstd'):
         self.prefix = prefix
         if config is None:
             d = os.path.dirname
@@ -21,6 +21,7 @@ class ParquetPanelLoader(PanelLoader):
         else:
             self.config = config
         self.date_format = self.config.get('date_format', '%Y%m%d')
+        self.compression = compression
 
     def get_dir(self, type: str, **load_kwargs) -> str:
         dir = os.path.join(self.prefix, self.config[type + '_prefix'])
@@ -73,7 +74,7 @@ class ParquetPanelLoader(PanelLoader):
         if not os.path.exists(dir):
             logger.info(f"Creating directory {dir} for saving block to {dst} ...")
             os.makedirs(dir, exist_ok=True)
-        block.data.to_parquet(dst, compression='zstd')
+        block.data.to_parquet(dst, compression=self.compression)
 
     def load_indexed_block_from_path(self, path: str, fields: T.Optional[list[str]] = None) -> PanelBlockIndexed:
         df = pd.read_parquet(path, columns=fields)
