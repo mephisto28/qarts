@@ -7,11 +7,16 @@ from .base import Processor, GlobalContext
 
 
 class DataStoreProcessor(Processor):
+    _name: str = 'data_store'
 
     def __init__(self, loader: PanelLoader, input_name: str, output_name: str):
         self.loader = loader
         self.input_name = input_name
         self.output_name = output_name
+
+    @property
+    def input_fields(self) -> list[str]:
+        return [self.input_name]
 
     def process(self, context: GlobalContext):
         date = context.current_datetime

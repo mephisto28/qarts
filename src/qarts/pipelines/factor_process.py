@@ -7,17 +7,25 @@ from .provider import DailyAndIntradayProvider
 
 
 class FactorsProcessorWrapper(Processor):
-    name: str = 'factors'
+    _name: str = 'factors'
+    _input_fields: list[str] = ['factor_context']
 
-    def __init__(self, processor: FactorsProcessor):
+    def __init__(self, processor: FactorsProcessor, factor_group_name: str = 'default'):
+        self.factor_group_name = factor_group_name
         self.processor = processor
         self.daily_fields = self.processor.get_daily_fields()
         self.intraday_fields = self.processor.get_intraday_fields()
 
+    @property
+    def name(self) -> str:
+        return f'factors_{self.factor_group_name}'
+
     def process(self, context: GlobalContext) -> T.Any:
-        factor_context = context.get('factor_context')
+        factor_context = context.get(self.input_fields[0])
         factors_block = self.processor(factor_context)
-        return factors_block
+        return {
+            f'factors_{self.factor_group_name}': factors_block
+        }
 
     @classmethod
     def from_factor_group(cls, factor_group_name: str):

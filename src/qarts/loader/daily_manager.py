@@ -38,3 +38,10 @@ class DailyDataManager:
             daily_block = daily_block.between(start_date=start_date, end_date=end_date)
         daily_block.ensure_order('instrument-first')
         return daily_block
+
+    def load_daily_block_after(self, date, num_period: int = 21, include: bool = True):
+        end_date = date + datetime.timedelta(days=num_period)
+        daily_block = self.daily_block.between(start_date=date, end_date=end_date)
+        daily_block.adjust_field_by_first(fields=self.daily_fields_require_adjustment)
+        daily_block.ensure_order('instrument-first')
+        return daily_block

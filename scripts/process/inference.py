@@ -19,12 +19,8 @@ def main(name: str, epoch: int):
     provider = pipeline.get_processor_by_type(DailyAndIntradayProvider)
     provider.target_specs = [
         VariableLoadSpec(var_type='factor', load_kwargs={'factor': output_name})]
-    provider.start_date = datetime.datetime.strptime(config.get('dataset', {}).get('test_start', '2023-01-01'), '%Y-%m-%d').date()
+    provider.start_date = datetime.datetime.strptime(config.get('dataset', {}).get('test_start', '2022-01-01'), '%Y-%m-%d').date()
     provider.end_date = datetime.datetime.strptime(config.get('dataset', {}).get('test_end', '2026-01-01'), '%Y-%m-%d').date()
     storage = DataStoreProcessor(loader, input_name=pipeline.processors[-1].name, output_name=f'models/{name}_e{epoch:02d}')
     pipeline.register_processor(storage)
     pipeline.run()
-
-
-if __name__ == "__main__":
-    main()

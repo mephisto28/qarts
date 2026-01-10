@@ -14,7 +14,7 @@ from qarts.pipelines.factor_process import get_factor_process_pipeline
 
 
 class ModelInferenceProcessor(Processor):
-    name: str = 'model_inference'
+    _name: str = 'inference'
 
     def __init__(
         self, 
@@ -50,11 +50,19 @@ class ModelInferenceProcessor(Processor):
         self.dtype = dtype
         self.model_name = model_name
         self.factor_group_name = factor_group_name
-        self.output_fields = output_fields
+        self.pred_fields = output_fields
         self.model: nn.Module = self.create_model()
         logger.info(f'Creating {model_name} output: {output_fields} Epoch: {epoch}')
 
         self.load_model(epoch)
+
+    @property
+    def input_fields(self) -> list[str]:
+        return [f'factors_{self.factor_group_name}']
+
+    @property
+    def name(self) -> str:
+        return f'inference_{self.factor_group_name}'
 
     def load_model(self, epoch: int = -1):
         d = os.path.dirname
@@ -78,7 +86,7 @@ class ModelInferenceProcessor(Processor):
         return model.to(device=self.device, dtype=self.dtype)
 
     def process(self, context: GlobalContext) -> T.Any:
-        factors_block = context.get('factors') # (F, N, T)
+        factors_block = context.get(self.input_fields[0]) # (F, N, T)
         X = factors_block.data.transpose(1, 2, 0) # (N, T, F)
         X = X[factors_block.is_valid_instruments]
         X = torch.tensor(X, dtype=self.dtype, device=self.device)
@@ -89,7 +97,7 @@ class ModelInferenceProcessor(Processor):
             instruments=factors_block.instruments[factors_block.is_valid_instruments],
             timestamps=factors_block.timestamps,
             data=preds.transpose(2, 0, 1),
-            fields=self.output_fields or [f'pred_{i}' for i in range(preds.shape[1])],
+            fields=self.pred_fields or [f'pred_{i}' for i in range(preds.shape[1])],
             frequency=factors_block.frequency
         )
 
