@@ -26,6 +26,8 @@ class DailyDataManager:
             fields=required_daily_fields_before_adjustment + ['instrument', 'factor']
         )
         daily_fields_require_adjustment = [field.replace('adjusted_', '') for field in self.fields if field.startswith('adjusted_')]
+        if 'alpha' in daily_block.data.columns:
+            daily_block.data['alpha'] = daily_block.data['alpha'].fillna(daily_block.data['daily_return'])
         daily_block.ensure_order('datetime-first')
         return daily_block, daily_fields_require_adjustment
 

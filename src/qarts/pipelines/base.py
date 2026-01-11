@@ -98,9 +98,12 @@ class BatchProcessPipeline:
 
     def run(self, *args, **kwargs) -> T.Any:
         for dt, task in self.task_generator():
-            self.context.set_datetime(dt)
-            if task is not None:
-                self.context.set('task', task)
-            for processor in self.processors:
-                result = processor(self.context)
-                self.context.set_result(processor.name, result)
+            self.run_one_step(dt, task)
+
+    def run_one_step(self, dt: datetime.datetime, task: T.Any = None):
+        self.context.set_datetime(dt)
+        if task is not None:
+            self.context.set('task', task)
+        for processor in self.processors:
+            result = processor(self.context)
+            self.context.set_result(processor.name, result)

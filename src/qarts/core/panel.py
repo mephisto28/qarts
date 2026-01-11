@@ -177,7 +177,8 @@ class PanelBlockDense:
             timestamps=self.timestamps,
             data=self.data[fields_idx],
             fields=fields,
-            frequency=self.frequency
+            frequency=self.frequency,
+            is_valid_instruments=self.is_valid_instruments
         )
 
     def get_dataframe(self, instrument: str = None, timestamp: pd.Timestamp | int = None) -> pd.DataFrame:
@@ -209,13 +210,14 @@ class PanelBlockDense:
         return pd.DataFrame(data_2d, index=index, columns=columns)
 
     @classmethod
-    def init_empty_from_context(cls, instruments: np.ndarray, timestamps: np.ndarray, fields: list[str], freq: str) -> 'PanelBlockDense':
-        return PanelBlockDense(
-            instruments=instruments,
-            timestamps=timestamps,
-            data=np.empty((len(fields), len(instruments), len(timestamps)), dtype=np.float32),
-            fields=fields,
-            frequency=freq
+    def empty_like(cls, other: 'PanelBlockDense', F: int = None, fields: list[str] = None) -> 'PanelBlockDense':
+        return cls(
+            instruments=other.instruments, 
+            timestamps=other.timestamps, 
+            data=np.empty((F or other.data.shape[0], len(other.instruments), len(other.timestamps))), 
+            fields=fields or other.fields, 
+            frequency=other.frequency, 
+            is_valid_instruments=other.is_valid_instruments
         )
     
     @classmethod

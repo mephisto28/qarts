@@ -8,7 +8,6 @@ from .provider import DailyAndIntradayProvider
 
 class FactorsProcessorWrapper(Processor):
     _name: str = 'factors'
-    _input_fields: list[str] = ['factor_context']
 
     def __init__(self, processor: FactorsProcessor, factor_group_name: str = 'default'):
         self.factor_group_name = factor_group_name
@@ -17,22 +16,27 @@ class FactorsProcessorWrapper(Processor):
         self.intraday_fields = self.processor.get_intraday_fields()
 
     @property
+    def input_fields(self) -> list[str]:
+        if self.processor.has_future_data:
+            return ['factor_context_future']
+        else:
+            return ['factor_context']
+
+    @property
     def name(self) -> str:
         return f'factors_{self.factor_group_name}'
 
     def process(self, context: GlobalContext) -> T.Any:
         factor_context = context.get(self.input_fields[0])
         factors_block = self.processor(factor_context)
-        return {
-            f'factors_{self.factor_group_name}': factors_block
-        }
+        return factors_block
 
     @classmethod
     def from_factor_group(cls, factor_group_name: str):
         factor_group = get_factor_group(factor_group_name)
         factor_factory = FactorsPipelineFactory(factor_group)
         factors_processor = factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
-        return cls(factors_processor)
+        return cls(factors_processor, factor_group_name=factor_group_name)
 
 
 def get_factor_process_pipeline(factor_group_name: str) -> BatchProcessPipeline:

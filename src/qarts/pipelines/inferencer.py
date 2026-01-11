@@ -5,6 +5,7 @@ import typing as T
 
 import torch
 import torch.nn as nn
+import numpy as np
 from loguru import logger
 
 from qarts.core.panel import PanelBlockDense
@@ -62,7 +63,7 @@ class ModelInferenceProcessor(Processor):
 
     @property
     def name(self) -> str:
-        return f'inference_{self.factor_group_name}'
+        return f'inference_{self.model_name}'
 
     def load_model(self, epoch: int = -1):
         d = os.path.dirname
@@ -98,7 +99,8 @@ class ModelInferenceProcessor(Processor):
             timestamps=factors_block.timestamps,
             data=preds.transpose(2, 0, 1),
             fields=self.pred_fields or [f'pred_{i}' for i in range(preds.shape[1])],
-            frequency=factors_block.frequency
+            frequency=factors_block.frequency,
+            is_valid_instruments=np.ones(len(preds), dtype=bool)
         )
 
 

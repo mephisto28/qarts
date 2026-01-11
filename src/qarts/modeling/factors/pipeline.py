@@ -51,6 +51,7 @@ class FactorsProcessor:
         self.input_fields = input_fields
         self.src = src
         self.is_online = is_online
+        self.has_future_data = ContextSrc.FUTURE_DAILY_QUOTATION in input_fields
 
     def get_daily_fields_before_adjustment(self) -> list[str]:
         required_daily_fields = self.get_daily_fields()
@@ -58,19 +59,13 @@ class FactorsProcessor:
         return required_daily_fields_before_adjustment
 
     def get_daily_fields(self) -> list[str]:
-        return list(set(self.input_fields[ContextSrc.DAILY_QUOTATION] + self.input_fields.get(ContextSrc.FUTURE_DAILY_QUOTATION, [])))
+        return list(set(self.input_fields.get(ContextSrc.DAILY_QUOTATION, []) + self.input_fields.get(ContextSrc.FUTURE_DAILY_QUOTATION, [])))
 
     def get_intraday_fields(self) -> list[str]:
         return self.input_fields[ContextSrc.INTRADAY_QUOTATION]
 
     def process_batch(self, context: FactorContext) -> FactorPanelBlockDense:
-        factors_block = FactorPanelBlockDense.init_empty_from_context(
-            context.inst_categories,
-            timestamps=context.blocks[self.src].timestamps,
-            fields=[f.name for f in self.factors],
-            freq=context.blocks[self.src].frequency
-        )
-        factors_block.is_valid_instruments = context.blocks[self.src].is_valid_instruments
+        factors_block = FactorPanelBlockDense.empty_like(context.blocks[self.src], F=len(self.factors), fields=[f.name for f in self.factors])
         context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
 
         context_ops = ContextOps(context, is_online=False)

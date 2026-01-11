@@ -47,7 +47,7 @@ class DailyAndIntradayProvider(Processor):
     def generate_tasks(self) -> T.Generator[tuple[datetime.datetime, T.Any], None, None]:
         load_spec = VariableLoadSpec(var_type='quotation', load_kwargs={})
         available_dates = self.loader.list_available_dates([load_spec])
-        available_dates = [date for date in available_dates if (date >= self.start_date or self.start_date is None) and (date <= self.end_date or self.end_date is None)]
+        available_dates = [date for date in available_dates if (self.start_date is None or date >= self.start_date) and (self.end_date is None or date <= self.end_date)]
         existing_dates = self.loader.list_available_dates(self.target_specs)
         required_dates = sorted(set(available_dates) - set(existing_dates))
 
@@ -55,15 +55,20 @@ class DailyAndIntradayProvider(Processor):
         for date in required_dates:
             yield datetime.datetime.combine(date, datetime.time(0, 0, 0)), None
 
-    def create_factor_context(self, daily_block: PanelBlockIndexed | PanelBlockDense, intraday_block: PanelBlockDense | PanelBlockIndexed) -> FactorContext:
+    def create_factor_context(
+        self, 
+        daily_block: PanelBlockIndexed | PanelBlockDense, 
+        intraday_block: PanelBlockDense | PanelBlockIndexed,
+        is_future: bool = False
+    ) -> FactorContext:
         if isinstance(daily_block, PanelBlockIndexed):
             daily_block = PanelBlockDense.from_indexed_block(
                 daily_block,
                 required_columns=list(daily_block.data.columns),
                 fill_methods=[get_fill_method(c) for c in daily_block.data.columns],
                 frequency='1D'
-            )
-        context = FactorContext.from_daily_block(daily_block)
+                )
+        context = FactorContext.from_daily_block(daily_block, is_future=is_future)
         if isinstance(intraday_block, PanelBlockIndexed):
             intraday_block = PanelBlockDense.from_indexed_block(
                 intraday_block,
@@ -99,7 +104,8 @@ class DailyAndIntradayProvider(Processor):
             )
             factor_context_future = self.create_factor_context(
                 daily_block_future, 
-                intraday_block=factor_context.blocks[ContextSrc.INTRADAY_QUOTATION]
+                intraday_block=factor_context.blocks[ContextSrc.INTRADAY_QUOTATION],
+                is_future=True
             )
             result['factor_context'] = factor_context
             result['factor_context_future'] = factor_context_future
