@@ -1,7 +1,7 @@
 set -x
 
 cur_dir=$(dirname $(realpath $0))
-project_dir=$(dirname $cur_dir)
+project_dir=$(dirname $(dirname $cur_dir))
 python=python
 
 exp_name=$1
@@ -17,7 +17,7 @@ pushd $project_dir
     echo "Branch: $branch" >> $run_dir/git_info.txt
     echo "Hash: $hash" >> $run_dir/git_info.txt
     git diff > $run_dir/git_diff.txt
-    script -q -a -c "${python} scripts/train_${exp_type}.py ${exp_name}" \
+    script -q -a -c "${python} scripts/train/train_${exp_type}.py ${exp_name}" \
         "${run_dir}/train.log"
     cat ${run_dir}/train.log >> $log_dir/train.log
 popd

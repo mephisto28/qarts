@@ -12,30 +12,36 @@ from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
 from .base import Factor, FactorSpec, get_factor
 from .context import ContextSrc, FactorContext
 from .ops import ContextOps
+from . import kernels as kns
 
 
 class PipelineFactory:
 
-    def __init__(self, factor_specs: list[FactorSpec]):
+    def __init__(self, factor_specs: list[FactorSpec], compute_rank: bool = False):
         self.factors = [get_factor(spec) for spec in factor_specs]
         input_fields = defaultdict(set)
         for factor in self.factors:
             for src in factor.input_fields:
                 input_fields[src].update(factor.input_fields[src])
         self.input_fields = {src: list(fields) for src, fields in input_fields.items()}
+        self.compute_rank = compute_rank
 
     def create_batch_pipeline(self, src: ContextSrc) -> T.Callable:
         return FactorsProcessor(
             factors=self.factors, 
             input_fields=self.input_fields,
-            src=src, is_online=False,
+            src=src, 
+            is_online=False,
+            compute_rank=self.compute_rank
         )
 
     def create_online_engine(self, src: ContextSrc) -> T.Callable:
         return FactorsProcessor(
             factors=self.factors,
             input_fields=self.input_fields,
-            src=src, is_online=True
+            src=src, 
+            is_online=True,
+            compute_rank=self.compute_rank
         )
 
 
@@ -45,13 +51,16 @@ class FactorsProcessor:
         factors: list[Factor], 
         input_fields: dict[str, list[str]],
         src: ContextSrc = ContextSrc.INTRADAY_QUOTATION,
-        is_online: bool = False
+        is_online: bool = False,
+        compute_rank: bool = False
     ):
         self.factors = factors
         self.input_fields = input_fields
         self.src = src
         self.is_online = is_online
         self.has_future_data = ContextSrc.FUTURE_DAILY_QUOTATION in input_fields
+        self.compute_rank = compute_rank
+        logger.info(f'create factors processor {"with rank " if compute_rank else ""}on {len(self.factors)} factors (is_online: {is_online})')
 
     def get_daily_fields_before_adjustment(self) -> list[str]:
         required_daily_fields = self.get_daily_fields()
@@ -65,13 +74,24 @@ class FactorsProcessor:
         return self.input_fields[ContextSrc.INTRADAY_QUOTATION]
 
     def process_batch(self, context: FactorContext) -> FactorPanelBlockDense:
-        factors_block = FactorPanelBlockDense.empty_like(context.blocks[self.src], F=len(self.factors), fields=[f.name for f in self.factors])
+        fields = [f.name for f in self.factors]
+        if self.compute_rank:
+            fields.extend([f'rank_{f.name}' for f in self.factors])
+        F = len(fields)
+        factors_block = FactorPanelBlockDense.empty_like(context.blocks[self.src], F=F, fields=fields)
         context.register_block(ContextSrc.FACTOR_CACHE, factors_block)
 
         context_ops = ContextOps(context, is_online=False)
         for i, factor in enumerate(self.factors):
             placeholder = factors_block.data[i]
             factor.compute_from_context(context_ops, placeholder)
+
+        if self.compute_rank:
+            inputs = factors_block.data[:F]
+            outputs = factors_block.data[F:]
+            kns.binned_percentile_axis1_strided(inputs, B=2000, k_sigma=3.5, out=outputs)
+            outputs[:] = outputs * 4 - 2 # [-2, 2], std=0.289 * 4
+
         for i, factor in enumerate(self.factors):
             value = factors_block.data[i]
             value -= factor.shift

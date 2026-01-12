@@ -24,6 +24,7 @@ def main(
     project_dir = d(d(d(os.path.abspath(__file__))))
     config_path = os.path.join(project_dir, 'experiments', 'config', f'{name}.json')
     config = json.load(open(config_path))
+    compute_rank = config.get('dataset', {}).get('rank_features', False)
 
     factor_group_name = 'default'
     target_group_name = 'targets_with_costs_10m_3D_with_rank'
@@ -38,7 +39,7 @@ def main(
     if os.path.exists(os.path.join(evaluator.output_dir, "eval_results.pkl")) and not overwrite:
         logger.info(f"Evaluation results already exist for {name} at epoch {epoch}")
     else:
-        factors_processor = FactorsProcessorWrapper.from_factor_group(factor_group_name)
+        factors_processor = FactorsProcessorWrapper.from_factor_group(factor_group_name, compute_rank=compute_rank)
         targets_processor = FactorsProcessorWrapper.from_factor_group(target_group_name)
         provider = DailyAndIntradayProvider(
             loader=ParquetPanelLoader(), 

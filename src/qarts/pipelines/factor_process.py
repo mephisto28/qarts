@@ -32,9 +32,9 @@ class FactorsProcessorWrapper(Processor):
         return factors_block
 
     @classmethod
-    def from_factor_group(cls, factor_group_name: str):
+    def from_factor_group(cls, factor_group_name: str, compute_rank: bool = False):
         factor_group = get_factor_group(factor_group_name)
-        factor_factory = FactorsPipelineFactory(factor_group)
+        factor_factory = FactorsPipelineFactory(factor_group, compute_rank=compute_rank)
         factors_processor = factor_factory.create_batch_pipeline(ContextSrc.INTRADAY_QUOTATION)
         return cls(factors_processor, factor_group_name=factor_group_name)
 

@@ -173,3 +173,98 @@ def fast_binned_percentile_2d(arr, n_bins=1000, sigma_clip=3.5, out: np.ndarray 
                 out[i, j] = rank_score / total_count
                 
     return out
+
+
+@nb.njit(parallel=True)
+def binned_percentile_axis1_strided(x, B=1024, k_sigma=3.0, eps=1e-12, out: np.ndarray = None):
+    """
+    x: (A, M, T) C-order
+    返回: (A, M, T) float32, 每个 (a,t) 对 m 维做近似 percentile
+    """
+    A, M, T = x.shape
+    if out is None:
+        out = np.empty((A, M, T), dtype=np.float32)
+
+    for a in nb.prange(A):
+        # 这两个数组在每个 a 内复用，避免反复分配
+        hist = np.empty(B, dtype=np.int32)
+        cdf  = np.empty(B, dtype=np.float32)
+
+        for t in range(T):
+            # 1) mean/std over m
+            s = 0.0
+            ss = 0.0
+            count = 0
+            for m in range(M):
+                v = x[a, m, t]
+                if v == v:
+                    s += v
+                    count += 1
+                    ss += v * v
+            mu = s / count
+            var = ss / count - mu * mu
+            if var < 0.0:
+                var = 0.0
+            sig = np.sqrt(var)
+
+            if sig < eps:
+                for m in range(M):
+                    out[a, m, t] = 0.5
+                continue
+
+            L = mu - k_sigma * sig
+            U = mu + k_sigma * sig
+            rng = U - L
+            if rng < eps:
+                for m in range(M):
+                    out[a, m, t] = 0.5
+                continue
+
+            # 2) reset hist
+            for b in range(B):
+                hist[b] = 0
+
+            # 3) fill hist (winsorize + bin)
+            inv_rng = 1.0 / rng
+            for m in range(M):
+                v = x[a, m, t]
+                if v < L:
+                    v = L
+                elif v > U:
+                    v = U
+                tt = (v - L) * inv_rng
+                b = int(tt * B)
+                if b >= B:
+                    b = B - 1
+                hist[b] += 1
+
+            # 4) prefix sum -> cdf
+            running = 0
+            inv_M = 1.0 / M
+            for b in range(B):
+                running += hist[b]
+                cdf[b] = running * inv_M
+
+            # 5) lookup (含 bin 内插值，减小台阶感)
+            for m in range(M):
+                v = x[a, m, t]
+                if v <= L:
+                    out[a, m, t] = 0.0
+                    continue
+                if v >= U:
+                    out[a, m, t] = 1.0
+                    continue
+
+                tt = (v - L) * inv_rng
+                b = int(tt * B)
+                if b >= B:
+                    b = B - 1
+
+                p1 = cdf[b]
+                p0 = 0.0 if b == 0 else cdf[b - 1]
+
+                left = b / B
+                frac = (tt - left) * B  # [0,1]
+                out[a, m, t] = p0 + (p1 - p0) * frac
+
+    return out

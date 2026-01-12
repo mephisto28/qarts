@@ -31,7 +31,7 @@ class IntradayDataset(data.Dataset):
         self.target_group = get_factor_group(self.target_group_name)
         self.filter_group_name = config.get('filter_group', 'default')
         self.filter_group = get_factor_group(self.filter_group_name)
-        self.factor_factory = PipelineFactory(self.factor_group)
+        self.factor_factory = PipelineFactory(self.factor_group, compute_rank=config.get('rank_features', False))
         self.target_factory = PipelineFactory(self.target_group)
         self.filter_factory = PipelineFactory(self.filter_group)
         logger.info(f'Factor group {self.factor_group_name}: {[f.name for f in self.factor_factory.factors]}')

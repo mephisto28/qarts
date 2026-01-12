@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from scipy.stats import rankdata, pearsonr
-from qarts.modeling.factors.kernels import fast_binned_percentile_2d
+from qarts.modeling.factors.kernels import fast_binned_percentile_2d, binned_percentile_axis1_strided
 
 
 class TestBinnedPercentile(unittest.TestCase):
@@ -18,7 +18,8 @@ class TestBinnedPercentile(unittest.TestCase):
         a = np.array([np.arange(50), np.arange(50, 0, -1)]).astype(np.float32)
         a[0, 0] = np.nan
         a[1, 1] = np.nan
-        result = fast_binned_percentile_2d(a, n_bins=1000, sigma_clip=3.5)
+        # result = fast_binned_percentile_2d(a, n_bins=1000, sigma_clip=3.5)
+        result = binned_percentile_axis1_strided(a[..., None], B=1000, k_sigma=3.5)[..., 0]
         self.assertTrue(np.isnan(result[0, 0]))
         self.assertTrue(np.isnan(result[1, 1]))
         self.assertTrue(~np.isnan(result[0, 1]))
@@ -27,7 +28,8 @@ class TestBinnedPercentile(unittest.TestCase):
         """测试近似 Rank 与 Scipy 真实 Rank 的一致性"""
         n_bins = 4000
         # 调用 Numba 函数
-        result = fast_binned_percentile_2d(self.data, n_bins=n_bins, sigma_clip=4.0)
+        # result = fast_binned_percentile_2d(self.data, n_bins=n_bins, sigma_clip=4.0)
+        result = binned_percentile_axis1_strided(self.data[..., None], B=n_bins, k_sigma=4.0)[..., 0]
         
         for i in range(self.n_rows):
             row = self.data[i]
