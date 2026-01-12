@@ -132,8 +132,13 @@ class DailyOps(BaseOps):
     def today_open(self, field: str, name: str = 'today_open') -> np.ndarray:
         assert ContextSrc.INTRADAY_QUOTATION in self.context.blocks
         block = self.context.blocks[ContextSrc.INTRADAY_QUOTATION]
-        field_values = block.get_view(field)
-        return field_values[:, 0]
+        if field in block.fields:
+            return block.get_view(field)[:, 0]
+        else:
+            block = self.context.blocks[ContextSrc.FACTOR_CACHE]
+            if field in block.fields:
+                return block.get_view(field)[:, 0]
+        raise ValueError(f"Field {field} not found in intraday quotation or factor cache")
 
     def history_rolling_moment_sequence(self, field: str, power: int, window: int, 
                                         input_value: T.Optional[np.ndarray] = None, 

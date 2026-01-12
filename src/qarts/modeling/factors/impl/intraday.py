@@ -12,6 +12,26 @@ __all__ = [
 ]
 
 
+@register_factor(FactorNames.TODAY_MOM)
+class TodayMomentum(FactorFromDailyAndIntraday):
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.today_momentum_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0] if ContextSrc.INTRADAY_QUOTATION in self.input_fields \
+            else self.input_fields[ContextSrc.FACTOR_CACHE][0]
+
+    @property
+    def name(self) -> str:
+        default_field = 'intraday_mom'
+        if self.today_momentum_field != default_field:
+            return f'{self.today_momentum_field}_{FactorNames.TODAY_MOM}'
+        return f'{FactorNames.TODAY_MOM}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        out[:] = ops.now(self.today_momentum_field) - ops.today_open(self.today_momentum_field)[:, :1]
+
+
+
 @register_factor(FactorNames.TODAY_VOLATILITY)
 class TodayVolatility(FactorFromDailyAndIntraday):
 

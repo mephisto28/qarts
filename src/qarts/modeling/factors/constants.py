@@ -15,6 +15,7 @@ class FactorNames:
     
     # intraday
     INTRADAY_MOM = 'intraday_mom'
+    TODAY_MOM = 'today_mom'
     TODAY_VOLATILITY = 'today_volatility'
     TODAY_SKEWNESS = 'today_skewness'
 
