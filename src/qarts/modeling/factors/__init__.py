@@ -7,7 +7,7 @@ from .impl.volatility import *
 from .impl.high_order import *
 from .impl.selection import *
 from .impl.intraday import *
-
+from .impl.transform import *
 from .impl.targets import *
 
 from .pipeline import PipelineFactory, IntradayBatchProcessingEngine, FactorsProcessor

@@ -12,10 +12,14 @@ class FactorNames:
     DAILY_VOLVOL = 'daily_volvol'
     DAILY_SKEWNESS = 'daily_skewness'
     DAILY_KURTOSIS = 'daily_kurtosis'
-
+    
+    # intraday
     INTRADAY_MOM = 'intraday_mom'
     TODAY_VOLATILITY = 'today_volatility'
     TODAY_SKEWNESS = 'today_skewness'
+
+    # transform
+    ABS_TRANSFORM = 'abs'
 
     # selction
     DAILY_RECENT_VACANCY = 'daily_recent_vacancy'
