@@ -14,12 +14,14 @@ class FactorNames:
     DAILY_KURTOSIS = 'daily_kurtosis'
 
     INTRADAY_MOM = 'intraday_mom'
-    IS_UP_LIMIT = 'is_up_limit'
-    IS_DOWN_LIMIT = 'is_down_limit'
-    IS_TRADABLE = 'is_tradable'
+    TODAY_VOLATILITY = 'today_volatility'
+    TODAY_SKEWNESS = 'today_skewness'
 
     # selction
     DAILY_RECENT_VACANCY = 'daily_recent_vacancy'
+    IS_UP_LIMIT = 'is_up_limit'
+    IS_DOWN_LIMIT = 'is_down_limit'
+    IS_TRADABLE = 'is_tradable'
 
     # targets
     FUTURE_DAY_TARGETS = 'future_day_targets'

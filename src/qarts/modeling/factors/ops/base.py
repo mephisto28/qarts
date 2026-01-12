@@ -7,7 +7,8 @@ class BaseOps:
 
     def __init__(self, context: FactorContext, is_online: bool = False):
         self.context = context
-        self.is_online = is_online # 
+        self.is_online = is_online
+        self.current_step = -1
 
     def now(self, field: str, window: int = -1) -> np.ndarray:
         assert ContextSrc.INTRADAY_QUOTATION in self.context.blocks
