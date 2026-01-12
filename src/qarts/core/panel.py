@@ -214,7 +214,7 @@ class PanelBlockDense:
         return cls(
             instruments=other.instruments, 
             timestamps=other.timestamps, 
-            data=np.empty((F or other.data.shape[0], len(other.instruments), len(other.timestamps))), 
+            data=np.empty((F or other.data.shape[0], len(other.instruments), len(other.timestamps)), dtype=np.float32), 
             fields=fields or other.fields, 
             frequency=other.frequency, 
             is_valid_instruments=other.is_valid_instruments
