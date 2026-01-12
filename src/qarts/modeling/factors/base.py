@@ -19,12 +19,14 @@ class FactorSpec:
 
 class Factor(metaclass=abc.ABCMeta):
 
-    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, scale: float = 1.0, shift: float = 0.0, need_cache: bool = False, **kwargs):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, scale: float = 1.0, shift: float = 0.0, need_cache: bool = False, lower: float = -10, upper: float = 10, **kwargs):
         self.window = window
         self.input_fields = input_fields
         self.scale = scale
         self.shift = shift
         self.need_cache = need_cache
+        self.lower = lower
+        self.upper = upper
         self.params = kwargs
         self._sources = list(self.input_fields.keys())
         self._check_inputs_valid()

@@ -96,6 +96,7 @@ class FactorsProcessor:
             value = factors_block.data[i]
             value -= factor.shift
             value *= factor.scale
+            np.clip(value, factor.lower, factor.upper, out=value)
         return factors_block
 
     def process_online(self, context: FactorContext) -> FactorPanelBlockDense:
