@@ -31,8 +31,8 @@ class DailyAndIntradayProvider(Processor):
         if 'factor' not in self.daily_fields:
             self.daily_fields.append('factor')
         self.intraday_fields = intraday_fields + ['instrument']
-        self.start_date = start_date    
-        self.end_date = end_date
+        self.start_date = start_date if isinstance(start_date, (datetime.date, type(None))) else datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+        self.end_date = end_date if isinstance(end_date, (datetime.date, type(None))) else datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
         self.target_specs = target_specs
         self.return_factor_context = return_factor_context
         self.daily_manager = DailyDataManager(loader, daily_fields, recent_days=-1) # load all daily data

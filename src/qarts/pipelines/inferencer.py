@@ -49,6 +49,7 @@ class ModelInferenceProcessor(Processor):
         self.config = model_config
         self.device = device
         self.dtype = dtype
+        self.epoch = epoch
         self.model_name = model_name
         self.factor_group_name = factor_group_name
         self.pred_fields = output_fields
