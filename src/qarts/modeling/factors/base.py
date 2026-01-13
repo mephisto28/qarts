@@ -19,7 +19,7 @@ class FactorSpec:
 
 class Factor(metaclass=abc.ABCMeta):
 
-    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, scale: float = 1.0, shift: float = 0.0, need_cache: bool = False, lower: float = -10, upper: float = 10, **kwargs):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, scale: float = 1.0, shift: float = 0.0, need_cache: bool = False, lower: float = -5, upper: float = 5, **kwargs):
         self.window = window
         self.input_fields = input_fields
         self.scale = scale
@@ -67,6 +67,14 @@ class DailyStats(metaclass=abc.ABCMeta):
     @property
     def name(self) -> str:
         return self.params.get('name', self.__class__.__name__)
+
+    @property
+    def output_fields(self) -> list[str]:
+        raise NotImplementedError
+
+    @property
+    def num_output_fields(self) -> int:
+        return len(self.output_fields)
     
     @property
     def sources(self) -> list[str]:

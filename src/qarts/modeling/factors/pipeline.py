@@ -9,7 +9,7 @@ from qarts.core import FactorPanelBlockDense, IntradayPanelBlockDense, DailyPane
 from qarts.core.panel import PanelBlockDense
 from qarts.utils.profiler import TimerProfiler
 from qarts.loader.dataloader import PanelLoader, VariableLoadSpec
-from .base import Factor, FactorSpec, get_factor
+from .base import Factor, FactorSpec, get_factor, DailyStats, DailyStatsSpec, get_stats
 from .context import ContextSrc, FactorContext
 from .ops import ContextOps
 from . import kernels as kns
@@ -17,14 +17,23 @@ from . import kernels as kns
 
 class PipelineFactory:
 
-    def __init__(self, factor_specs: list[FactorSpec], compute_rank: bool = False):
-        self.factors = [get_factor(spec) for spec in factor_specs]
+    def __init__(self, factor_specs: list[FactorSpec | DailyStatsSpec], compute_rank: bool = False):
+        if isinstance(factor_specs[0], FactorSpec):
+            self.factors = [get_factor(spec) for spec in factor_specs]
+        else:
+            self.factors = [get_stats(spec) for spec in factor_specs]
         input_fields = defaultdict(set)
         for factor in self.factors:
             for src in factor.input_fields:
                 input_fields[src].update(factor.input_fields[src])
         self.input_fields = {src: list(fields) for src, fields in input_fields.items()}
         self.compute_rank = compute_rank
+
+    def create_daily_stats_processor(self) -> T.Callable:
+        return DailyStatsProcessor(
+            stats=self.factors,
+            input_fields=self.input_fields,
+        )
 
     def create_batch_pipeline(self, src: ContextSrc) -> T.Callable:
         return FactorsProcessor(
@@ -98,6 +107,33 @@ class FactorsProcessor:
             value *= factor.scale
             np.clip(value, factor.lower, factor.upper, out=value)
         return factors_block
+
+    def process_online(self, context: FactorContext) -> FactorPanelBlockDense:
+        # TODO
+        raise NotImplementedError
+
+    def __call__(self, context: FactorContext) -> FactorPanelBlockDense:
+        if self.is_online:
+            return self.process_online(context)
+        else:
+            return self.process_batch(context)
+
+
+class DailyStatsProcessor:
+    def __init__(
+        self, 
+        stats: list[DailyStats], 
+        input_fields: dict[str, list[str]],
+    ):
+        self.stats = stats
+        self.input_fields = input_fields
+
+    def process_batch(self, context: FactorContext) -> FactorPanelBlockDense:
+        context_ops = ContextOps(context, is_online=False)
+        for i, stat in enumerate(self.stats):
+            output = stat.compute_from_context(context_ops)
+
+        return output
 
     def process_online(self, context: FactorContext) -> FactorPanelBlockDense:
         # TODO
