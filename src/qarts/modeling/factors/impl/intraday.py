@@ -72,6 +72,41 @@ class TodaySkewness(FactorFromDailyAndIntraday):
         cum_skewness(diff_values, out)
 
 
+@register_factor(FactorNames.TODAY_POSITION)
+class TodayPosition(FactorFromDailyAndIntraday):
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.price_field, self.high_field, self.low_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION]
+
+    @property
+    def name(self) -> str:
+        default_field = 'mid_price'
+        if self.price_field != default_field:
+            return f'{self.price_field}_{FactorNames.TODAY_POSITION}'
+        return f'{FactorNames.TODAY_POSITION}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        price = ops.now(self.price_field)
+        high = ops.today_high(self.high_field)
+        low = ops.today_low(self.low_field)
+        compute_position(price, high, low, out)
+
+
+@nb.njit
+def compute_position(price: np.ndarray, high: np.ndarray, low: np.ndarray, out: np.ndarray):
+    N, T = price.shape
+    for i in nb.prange(N):
+        for t in range(T):
+            spread = high[i, t] - low[i, t]
+            p = price[i, t]
+            if spread == 0 or spread != spread or p == 0:
+                out[i, t] = 0.5
+            else:
+                out[i, t] = (p - low[i, t]) / spread
+    return out
+
+
 @nb.njit(parallel=True)
 def cum_realized_vol(x: np.ndarray, out: np.ndarray):
     N, T = x.shape

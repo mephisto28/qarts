@@ -31,7 +31,7 @@ class VolumeRatio(FactorFromDailyAndIntraday):
         history_volume = ops.history_window_ma(self.history_volume_field, window=self.window)
         current_volume = ops.today_cumsum(self.intraday_volume_field)
         current_time_fraction = ops.time_fraction()
-        today_volume_estimated = current_volume / current_time_fraction
+        today_volume_estimated = (current_volume + 1) / current_time_fraction
         np.log(today_volume_estimated, out=out)
         out -= np.log(history_volume)
 

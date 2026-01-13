@@ -26,6 +26,22 @@ class IntradayOps(BaseOps):
             data = input_value
         return np.nancumsum(data, axis=1)
 
+    @context_timestep_cache
+    def today_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'today_high') -> np.ndarray:
+        if input_value is None:
+            data = self.now(field)
+        else:
+            data = input_value
+        return np.maximum.accumulate(data, axis=1)
+
+    @context_timestep_cache
+    def today_low(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'today_low') -> np.ndarray:
+        if input_value is None:
+            data = self.now(field)
+        else:
+            data = input_value
+        return np.minimum.accumulate(data, axis=1)
+
     def time_fraction(self) -> np.ndarray:
         if getattr(self, '_time_fraction', None) is None:
             T = len(self.context.blocks[ContextSrc.INTRADAY_QUOTATION].timestamps)
