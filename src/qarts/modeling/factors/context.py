@@ -96,13 +96,15 @@ def create_mock_context(size=10, seed=42):
     low = daily_prices * (1 - np.random.uniform(0, 0.03, size=(size, daily_len + 1)))
     volume = np.exp(np.random.normal(loc=12, scale=1, size=(size, daily_len + 1)))
     daily_return = np.concatenate([np.zeros((size, 1)), np.log(daily_prices[:, 1:] / daily_prices[:, :-1])], axis=1)
-    block_data = np.stack([open, high, low, close, volume, daily_return], axis=0)
-    fields = ['adjusted_open', 'adjusted_high', 'adjusted_low', 'adjusted_close', 'volume', 'daily_return']
+    block_data = np.stack([open, high, low, close, volume, volume, daily_return], axis=0)
+    fields = ['adjusted_open', 'adjusted_high', 'adjusted_low', 'adjusted_close', 'volume', 'adjusted_volume', 'daily_return']
     
     intraday_len = 240
     minutes = np.arange(intraday_len + 1)
     intraday_prices = simulate_noisy_random_walk(s0=daily_prices[:, -1], mu=0.00, sigma=0.001, n_steps=intraday_len, n_paths=size, seed=seed)
     intraday_mom = np.log(intraday_prices / intraday_prices[:, 0:1])
+    intraday_volume = np.exp(np.random.normal(loc=7, scale=1, size=(size, intraday_len + 1)))
+    intraday_volume_cumsum = np.nancumsum(intraday_volume, axis=1)
     daily_block = PanelBlockDense(
         instruments=instruments,
         timestamps=dates,
@@ -113,8 +115,8 @@ def create_mock_context(size=10, seed=42):
     intraday_block = PanelBlockDense(
         instruments=instruments,
         timestamps=minutes,
-        data=np.stack([intraday_prices], axis=0),
-        fields=['mid_price', ],
+        data=np.stack([intraday_prices, intraday_volume_cumsum], axis=0),
+        fields=['mid_price', 'volume'],
         frequency='1min'
     )
     vacancy = np.zeros((10, len(instruments), len(minutes)), dtype=np.float32)
