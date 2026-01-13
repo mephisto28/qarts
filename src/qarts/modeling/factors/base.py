@@ -45,7 +45,33 @@ class Factor(metaclass=abc.ABCMeta):
     @property
     def sources(self) -> list[str]:
         return self._sources
+    
 
+@dataclass
+class DailyStatsSpec:
+    name: str
+    input_fields: dict[str, list[str]]
+    params: dict = field(default_factory=dict)
+
+
+class DailyStats(metaclass=abc.ABCMeta):
+    
+    def __init__(self, input_fields: dict[str, list[str]], **kwargs):
+        self.input_fields = input_fields
+        self._sources = list(self.input_fields.keys())
+
+    @abc.abstractmethod
+    def compute_from_context(self, context: ContextOps):
+        raise NotImplementedError
+
+    @property
+    def name(self) -> str:
+        return self.params.get('name', self.__class__.__name__)
+    
+    @property
+    def sources(self) -> list[str]:
+        return self._sources
+    
 
 class FactorFromDailyAndIntraday(Factor):
 
@@ -68,7 +94,7 @@ class FactorFromDailyAndIntraday(Factor):
 
 
 _factors_registry: T.Dict[str, type['Factor']] = {}
-
+_stats_registry: T.Dict[str, type['DailyStats']] = {}
 
 def register_factor(name: str):
     def wrapper(factor_class: type['Factor']) -> type['Factor']:
@@ -90,3 +116,22 @@ def _(factor_name: str, input_fields: dict[str, list[str]], window: int = 1, **k
 def _(spec: FactorSpec) -> Factor:
     return get_factor(spec.name, input_fields=spec.input_fields, window=spec.window, need_cache=spec.need_cache, **spec.params)
 
+
+def register_stats(name: str):
+    def wrapper(stats_class: type['DailyStats']) -> type['DailyStats']:
+        _stats_registry[name] = stats_class
+        return stats_class
+    return wrapper
+
+@functools.singledispatch
+def get_stats(stats, *args, **kwargs) -> DailyStats:
+    raise TypeError(f"Invalid stats type: {type(stats)}")
+
+@get_stats.register
+def _(stats_name: str, input_fields: dict[str, list[str]], **kwargs) -> DailyStats:
+    S = _stats_registry[stats_name]
+    return S(input_fields=input_fields, **kwargs)
+
+@get_stats.register
+def _(spec: DailyStatsSpec) -> DailyStats:
+    return get_stats(spec.name, input_fields=spec.input_fields, **spec.params)
