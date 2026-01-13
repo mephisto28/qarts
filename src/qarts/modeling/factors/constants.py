@@ -15,12 +15,14 @@ class FactorNames:
     DAILY_KURTOSIS = 'daily_kurtosis'
 
     VOLUME_RATIO = 'volume_ratio'
+    RV_CORR = 'rv_corr'
     
     # intraday
     INTRADAY_MOM = 'intraday_mom'
     TODAY_MOM = 'today_mom'
     TODAY_VOLATILITY = 'today_volatility'
     TODAY_SKEWNESS = 'today_skewness'
+    TODAY_POSITION = 'today_position'
 
     # transform
     ABS_TRANSFORM = 'abs'
