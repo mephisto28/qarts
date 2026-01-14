@@ -145,7 +145,8 @@ class TodayAmountRatio(FactorFromDailyAndIntraday):
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
         certain_amount = ops.today_cumsum(self.certain_amount_field)
         total_amount = ops.today_cumsum(self.total_amount_field)
-        out[:] = certain_amount / total_amount
+        np.nan_to_num(certain_amount, copy=False, nan=0)
+        out[:] = certain_amount / (total_amount + 1)
 
 
 @njit(parallel=True, fastmath=True, cache=True)
