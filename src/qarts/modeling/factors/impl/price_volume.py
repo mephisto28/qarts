@@ -22,11 +22,17 @@ class ReturnVolumeCorr(FactorFromDailyAndIntraday):
         self.d_ret = self.input_fields[ContextSrc.DAILY_QUOTATION][0]
         self.d_vol = self.input_fields[ContextSrc.DAILY_QUOTATION][1]
         # Intraday fields
-        self.i_ret = self.input_fields[ContextSrc.FACTOR_CACHE][0]
-        self.i_vol = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+        if ContextSrc.FACTOR_CACHE in self.input_fields:
+            self.i_ret = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+            self.i_vol = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+        else:
+            self.i_ret = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+            self.i_vol = self.input_fields[ContextSrc.INTRADAY_QUOTATION][1]
 
     @property
     def name(self) -> str:
+        if self.d_ret != 'daily_return':
+            return f'{self.d_ret}_{FactorNames.RV_CORR}_{self.window}'
         return f'rv_corr_{self.window}'
 
     @staticmethod
@@ -72,11 +78,11 @@ class ReturnVolumeCorr(FactorFromDailyAndIntraday):
         
         # 2. Prepare Today's Data
         # (N, T)
-        t_ret = ops.now_factor(self.i_ret)
+        t_ret = ops.now(self.i_ret)
         t_vol = ops.get_field(ContextSrc.INTRADAY_QUOTATION, self.i_vol)
         current_time_fraction = ops.time_fraction()
         t_vol = t_vol / current_time_fraction
-        
+
         # 3. Compute via Numba
         _calc_rolling_corr_intraday(
             out,
@@ -87,6 +93,43 @@ class ReturnVolumeCorr(FactorFromDailyAndIntraday):
             t_ret, t_vol,
             min_periods=max(2, self.window // 2)
         )
+
+
+@register_factor(FactorNames.DAILY_ON_BALANCE_VOLUME_RATIO)
+class DailyOBVRatio(FactorFromDailyAndIntraday):
+    num_daily_fields = 2
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.history_return_field, self.history_volume_field = self.input_fields[ContextSrc.DAILY_QUOTATION]
+        if ContextSrc.FACTOR_CACHE in self.input_fields:
+            self.intraday_return_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+            self.intraday_volume_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+        else:
+            self.intraday_return_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+            self.intraday_volume_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][1]
+
+    @property
+    def name(self) -> str:
+        if self.history_return_field != 'daily_return':
+            return f'{self.history_return_field}_{FactorNames.DAILY_ON_BALANCE_VOLUME_RATIO}_{self.window}'
+        return f'{FactorNames.DAILY_ON_BALANCE_VOLUME_RATIO}_{self.window}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        history_volume_ma = ops.history_window_ma(self.history_volume_field, window=self.window)
+        history_volume = ops.get_field(ContextSrc.DAILY_QUOTATION, self.history_volume_field)
+        history_return = ops.get_field(ContextSrc.DAILY_QUOTATION, self.history_return_field)
+        history_return_sign = np.sign(history_return)
+        obv_volume_suffix_sum = ops.history_prod_cumsum((self.history_return_field, self.history_volume_field), (history_return_sign, history_volume))
+        obv_volume_mean = obv_volume_suffix_sum[:, -self.window+1] / self.window
+        current_volume = ops.now(self.intraday_volume_field)
+        current_return = ops.now(self.intraday_return_field)
+        current_time_fraction = ops.time_fraction()
+        out[:] = (current_volume * np.sign(current_return)) / current_time_fraction
+        out /= self.window
+        out += obv_volume_mean[:, None]
+        out /= history_volume_ma + 1
+
 
 
 @njit(parallel=True, fastmath=True, cache=True)
