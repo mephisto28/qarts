@@ -69,7 +69,7 @@ class Trainer:
     def get_lr_scheduler(self, train_config: dict):
         lr_scheduler_type = train_config['lr_scheduler']
         if lr_scheduler_type == 'cosine':
-            return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer, **train_config['lr_scheduler_params'])
+            return torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, **train_config['lr_scheduler_params'])
         else:
             raise ValueError(f'LR scheduler type {lr_scheduler_type} not supported')
 
@@ -163,8 +163,11 @@ class Trainer:
                 loss, loss_info = loss_fn(preds, y)
                 eval_results = evaluator(preds, y)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
                 self.lr_scheduler.step()
+                lr = self.optimizer.param_groups[0]['lr']
+                eval_results['lr'] = lr
                 if step % log_interval == 0:
                     detailed_loss_info = ', '.join([f'{n}: {v:.4f}' for n, v in loss_info.items()])
                     logger.info(f"Step {step:05d}(E{epoch}) (B{B}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
