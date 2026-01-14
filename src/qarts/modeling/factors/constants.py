@@ -16,6 +16,7 @@ class FactorNames:
 
     VOLUME_RATIO = 'volume_ratio'
     RV_CORR = 'rv_corr'
+    DAILY_ON_BALANCE_VOLUME_RATIO = 'daily_on_balance_volume_ratio'
     
     # intraday
     INTRADAY_MOM = 'intraday_mom'
@@ -23,6 +24,9 @@ class FactorNames:
     TODAY_VOLATILITY = 'today_volatility'
     TODAY_SKEWNESS = 'today_skewness'
     TODAY_POSITION = 'today_position'
+
+    TODAY_STD = 'today_std'
+    TODAY_LOG_SKEWNESS = 'today_log_skewness'
 
     # transform
     ABS_TRANSFORM = 'abs'

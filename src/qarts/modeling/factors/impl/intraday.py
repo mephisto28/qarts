@@ -72,6 +72,48 @@ class TodaySkewness(FactorFromDailyAndIntraday):
         cum_skewness(diff_values, out)
 
 
+@register_factor(FactorNames.TODAY_STD)
+class TodayLogStd(FactorFromDailyAndIntraday):
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.today_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0] if ContextSrc.INTRADAY_QUOTATION in self.input_fields \
+            else self.input_fields[ContextSrc.FACTOR_CACHE][0]
+
+    @property
+    def name(self) -> str:
+        default_field = 'amount'
+        if self.today_field != default_field:
+            return f'{self.today_field}_{FactorNames.TODAY_STD}'
+        return f'{FactorNames.TODAY_STD}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        values = ops.now(self.today_field)
+        np.log(values + 1, out=out)
+        cum_std(out, out)
+
+
+@register_factor(FactorNames.TODAY_LOG_SKEWNESS)
+class TodayLogSkewness(FactorFromDailyAndIntraday):
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.today_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0] if ContextSrc.INTRADAY_QUOTATION in self.input_fields \
+            else self.input_fields[ContextSrc.FACTOR_CACHE][0]
+
+    @property
+    def name(self) -> str:
+        default_field = 'amount'
+        if self.today_field != default_field:
+            return f'{self.today_field}_{FactorNames.TODAY_LOG_SKEWNESS}'
+        return f'{FactorNames.TODAY_LOG_SKEWNESS}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        values = ops.now(self.today_field)
+        np.log(values + 1, out=out)
+        cum_skewness(out, out)
+
+
 @register_factor(FactorNames.TODAY_POSITION)
 class TodayPosition(FactorFromDailyAndIntraday):
 
@@ -124,6 +166,49 @@ def cum_realized_vol(x: np.ndarray, out: np.ndarray):
             else:
                 out[i, t] = s * 0.5
     return out
+
+
+@nb.njit(parallel=True)
+def cum_std(x: np.ndarray, out: np.ndarray, ddof: int = 0):
+    N, T = x.shape
+    for i in nb.prange(N):
+        mean = 0.0
+        M2 = 0.0   # sum of squares of differences from the current mean
+        cnt = 0    # number of non-NaN observations
+
+        for t in range(T):
+            v = x[i, t]
+            if np.isnan(v):
+                # expanding 语义：NaN 不参与统计，但该时点输出等于“到目前为止”的std
+                if cnt == 0:
+                    out[i, t] = np.nan
+                else:
+                    # ddof=0
+                    var = M2 / cnt
+                    out[i, t] = np.sqrt(var) if var > 0.0 else 0.0
+                continue
+
+            cnt += 1
+            if cnt == 1:
+                mean = v
+                M2 = 0.0
+                out[i, t] = 0.0  # ddof=0 下单点方差为0
+            else:
+                delta = v - mean
+                mean += delta / cnt
+                delta2 = v - mean
+                M2 += delta * delta2
+
+                if ddof == 0:
+                    var = M2 / cnt
+                    out[i, t] = np.sqrt(var) if var > 0.0 else 0.0
+
+                elif ddof == 1:
+                    if cnt < 2:
+                        out[i, t] = 0
+                    else:
+                        var = M2 / (cnt - 1)
+                        out[i, t] = np.sqrt(var) if var > 0.0 else 0.0
 
 
 @nb.njit(parallel=True)

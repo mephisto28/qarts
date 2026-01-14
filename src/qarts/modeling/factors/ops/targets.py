@@ -18,9 +18,6 @@ class TargetsOps(BaseOps):
         block = self.context.blocks[ContextSrc.FUTURE_DAILY_QUOTATION]
         return block.get_view(field)[:, window]
 
-    def today(self, field: str) -> np.ndarray:
-        return self.future_n_days(field, n=0)
-
     @context_static_cache
     def _future_prefix_high(self, field: str, input_value: T.Optional[np.ndarray] = None, name: str = 'future_prefix_high') -> np.ndarray:
         data = self.context.get_field(src=ContextSrc.FUTURE_DAILY_QUOTATION, field=field)
@@ -43,7 +40,7 @@ class TargetsOps(BaseOps):
     @expand_tdim
     def future_price_over_today_close(self, field: str, window: int = 1) -> np.ndarray:
         future_price = self.future_n_days(field, window)
-        today_close = self.today(field)
+        today_close = self.future_n_days(field, n=0)
         return future_price / today_close
       
     @expand_tdim
