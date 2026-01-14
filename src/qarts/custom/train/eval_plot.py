@@ -193,7 +193,7 @@ def build_report(eval_dir: str):
     # Quantile curves
     qret_mean = np.nanmean(res["qret"], axis=0) if res["qret"].size else None  # (D,Q)
     if qret_mean is not None:
-        rpt.add_figure(plot_quantile_curve(qret_mean, res["horizons"], "Average quantile return curve (cross-section)"),
+        rpt.add_figure(plot_quantile_curve(qret_mean, list(res['df_rankic'].columns), "Average quantile return curve (cross-section)"),
                     caption="Mean forward return per signal quantile (low->high), averaged across all minutes and days.")
     # bucket_mean = np.nanmean(res["bucket_ret"], axis=0) if res["bucket_ret"].size else None  # (D,K)
     # if bucket_mean is not None:
