@@ -84,7 +84,14 @@ class ParquetPanelLoader(PanelLoader):
         dir = self.get_dir('quotation')
         date_str = date.strftime('%Y%m%d') if isinstance(date, datetime.date) else date
         path = os.path.join(dir, f'{date_str}.parquet')
-        return self.load_indexed_block_from_path(path, fields=fields)
+        
+        fields = list(set([f.replace('total_volume', 'volume') for f in fields]))
+        block = self.load_indexed_block_from_path(path, fields=fields)
+        if 'volume' in block.fields: # TODO: adhoc, delete this line after refactor preprocessing
+            df = block.data
+            df['total_volume'] = df['volume'].cumsum()
+            block.fields.append('total_volume')
+        return block
 
     def save_intraday_quotation(self, block: PanelBlockIndexed, date: datetime.date | str) -> None:
         dir = self.get_dir('quotation')
