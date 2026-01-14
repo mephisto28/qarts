@@ -1,6 +1,7 @@
 import os
 import json
 import glob
+import time
 
 import torch
 import wandb
@@ -149,8 +150,9 @@ class Trainer:
         for epoch in range(num_epochs):
             self.save_model(epoch)
             self.model.train()
-            
-            for batch in dataloader:
+
+            last_timestamp = time.time()
+            for i, batch in enumerate(dataloader):
                 X = batch['features'].to(dtype=self.dtype, device=self.device)
                 y = batch['targets'].to(dtype=self.dtype, device=self.device)
                 B = X.shape[0]
@@ -167,7 +169,12 @@ class Trainer:
                 self.optimizer.step()
                 self.lr_scheduler.step()
                 lr = self.optimizer.param_groups[0]['lr']
+                current_timestamp = time.time()
                 eval_results['lr'] = lr
+                eval_results['loss'] = loss.item()
+                eval_results['speed'] = current_timestamp - last_timestamp if current_timestamp - last_timestamp < 30 else 2
+                last_timestamp = current_timestamp
+
                 if step % log_interval == 0:
                     detailed_loss_info = ', '.join([f'{n}: {v:.4f}' for n, v in loss_info.items()])
                     logger.info(f"Step {step:05d}(E{epoch}) (B{B}), LR: {self.optimizer.param_groups[0]['lr']:.5f}, Loss: {loss.item():.6f}, {detailed_loss_info}")
@@ -175,6 +182,4 @@ class Trainer:
                 if step % eval_interval == 0:
                     detailed_eval_results = ', '.join([f'{n}: {v:.4f}' for n, v in eval_results.items()])
                     logger.info(f"Step {step:05d}(E{epoch}), Eval: {detailed_eval_results}")
-
-
                 step += 1
