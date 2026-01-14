@@ -24,11 +24,13 @@ class FactorNames:
     TODAY_VOLATILITY = 'today_volatility'
     TODAY_SKEWNESS = 'today_skewness'
     TODAY_POSITION = 'today_position'
+    TODAY_AMOUNT_RATIO = 'today_amount_ratio'
 
     TODAY_STD = 'today_std'
     TODAY_LOG_SKEWNESS = 'today_log_skewness'
 
     # transform
+    ID_TRANSFORM = 'id'
     ABS_TRANSFORM = 'abs'
     DIV_TRANSFORM = 'div'
 

@@ -131,6 +131,22 @@ class DailyOBVRatio(FactorFromDailyAndIntraday):
         out /= history_volume_ma + 1
 
 
+@register_factor(FactorNames.TODAY_AMOUNT_RATIO)
+class TodayAmountRatio(FactorFromDailyAndIntraday):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.certain_amount_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+        self.total_amount_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][1]
+
+    @property
+    def name(self) -> str:
+        return f'{FactorNames.TODAY_AMOUNT_RATIO}_{self.certain_amount_field}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        certain_amount = ops.today_cumsum(self.certain_amount_field)
+        total_amount = ops.today_cumsum(self.total_amount_field)
+        out[:] = certain_amount / total_amount
+
 
 @njit(parallel=True, fastmath=True, cache=True)
 def _calc_rolling_corr_intraday(

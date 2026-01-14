@@ -22,7 +22,7 @@ class TodayMomentum(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        default_field = 'intraday_mom'
+        default_field = 'daily_mom_1'
         if self.today_momentum_field != default_field:
             return f'{self.today_momentum_field}_{FactorNames.TODAY_MOM}'
         return f'{FactorNames.TODAY_MOM}'
@@ -42,7 +42,7 @@ class TodayVolatility(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        default_field = 'intraday_mom'
+        default_field = 'daily_mom_1'
         if self.today_momentum_field != default_field:
             return f'{self.today_momentum_field}_{FactorNames.TODAY_VOLATILITY}'
         return f'{FactorNames.TODAY_VOLATILITY}'
@@ -62,7 +62,7 @@ class TodaySkewness(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        default_field = 'intraday_mom'
+        default_field = 'daily_mom_1'
         if self.today_momentum_field != default_field:
             return f'{self.today_momentum_field}_{FactorNames.TODAY_SKEWNESS}'
         return f'{FactorNames.TODAY_SKEWNESS}'
