@@ -66,6 +66,8 @@ class EvaluatorProcessor(Processor):
         targets = targets_block.get_copy(self.target_fields)
         pred_s = preds.data.transpose(1, 2, 0)[preds_block.is_valid_instruments, ::self.sample_stride]
         gt_s = targets.data.transpose(1, 2, 0)[targets_block.is_valid_instruments, ::self.sample_stride]
+        pred_s = self.sample_execution_period(pred_s)
+        gt_s = self.sample_execution_period(gt_s)
         if pred_s.shape[-1] == 1:
             pred_s = np.tile(pred_s, (1, 1, gt_s.shape[-1]))
         N, T, D = pred_s.shape
@@ -75,6 +77,7 @@ class EvaluatorProcessor(Processor):
         rg = rankdata(gt_s, axis=0, method="average", nan_policy="omit")
         rankic_td = eval_utils.nan_corr_xs(rp, rg, axis=0, min_count=self.min_count_xs)
         rankic_long_tdh = eval_utils.nan_corr_xs_long(rp, rg, quantiles=0.5, axis=0, min_count=self.min_count_xs)
+        rankic_short_tdh = eval_utils.nan_corr_xs_long(-rp, rg, quantiles=0.5, axis=0, min_count=self.min_count_xs)
 
         hit_td = eval_utils.nan_hit_rate_xs(pred_s, gt_s, axis=0, min_count=self.min_count_xs)
         auc_td = np.full((T, D), np.nan)
@@ -95,17 +98,18 @@ class EvaluatorProcessor(Processor):
 
         self.metrics.append({
             'date': context.current_datetime,
-            'eval_ic': self.sample_execution_period(ic_td).mean(0),
-            'eval_rankic': self.sample_execution_period(rankic_td).mean(0),
-            'eval_rankic_long': self.sample_execution_period(rankic_long_tdh).mean(0),
-            'eval_hit': self.sample_execution_period(hit_td).mean(0),
-            'eval_auc': self.sample_execution_period(auc_td).mean(0),
-            'eval_qret': self.sample_execution_period(qret_tdh).mean(0),
-            'eval_qret_top': self.sample_execution_period(qret_tdh).mean(0)[:, -1],
-            'eval_qret_bot': self.sample_execution_period(qret_tdh).mean(0)[:, 0],
-            'eval_qspread': self.sample_execution_period(qspread_td).mean(0),
-            'eval_qmono': self.sample_execution_period(qmono_td).mean(0),
-            'eval_tail': self.sample_execution_period(tail_td).mean(0),
+            'eval_ic': ic_td.mean(0),
+            'eval_rankic': rankic_td.mean(0),
+            'eval_rankic_long': rankic_long_tdh.mean(0),
+            'eval_rankic_short': rankic_short_tdh.mean(0),
+            'eval_hit': hit_td.mean(0),
+            'eval_auc': auc_td.mean(0),
+            'eval_qret': qret_tdh.mean(0),
+            'eval_qret_top': qret_tdh.mean(0)[:, -1],
+            'eval_qret_bot': qret_tdh.mean(0)[:, 0],
+            'eval_qspread': qspread_td.mean(0),
+            'eval_qmono': qmono_td.mean(0),
+            'eval_tail': tail_td.mean(0),
             # TODO: add more metrics here
         })
         logger.info(
@@ -135,6 +139,7 @@ class EvaluatorProcessor(Processor):
         ic = np.vstack([m['eval_ic'] for m in self.metrics]) 
         ric = np.vstack([m['eval_rankic'] for m in self.metrics]) 
         ric_long = np.vstack([m['eval_rankic_long'] for m in self.metrics]) 
+        ric_short = np.vstack([m['eval_rankic_short'] for m in self.metrics]) 
         hit = np.vstack([m['eval_hit'] for m in self.metrics]) 
         auc = np.vstack([m['eval_auc'] for m in self.metrics]) 
 
@@ -151,6 +156,7 @@ class EvaluatorProcessor(Processor):
         df_ic = pd.DataFrame(ic, index=dates, columns=self.target_fields)
         df_rankic = pd.DataFrame(ric, index=dates, columns=self.target_fields)
         df_rankic_long = pd.DataFrame(ric_long, index=dates, columns=self.target_fields)
+        df_rankic_short = pd.DataFrame(ric_short, index=dates, columns=self.target_fields)
         df_hit = pd.DataFrame(hit, index=dates, columns=self.target_fields)
         df_auc = pd.DataFrame(auc, index=dates, columns=self.target_fields)
         # df_bt_ret = pd.DataFrame(bt_ret, index=dates, columns=self.h_names)
@@ -178,6 +184,8 @@ class EvaluatorProcessor(Processor):
                 "RankIC_std": rstd,
                 "RankIC_long_mean": float(np.nanmean(df_rankic_long.iloc[:, j].values)),
                 "RankIC_long_std": float(np.nanstd(df_rankic_long.iloc[:, j].values, ddof=1)),
+                "RankIC_short_mean": float(np.nanmean(df_rankic_short.iloc[:, j].values)),
+                "RankIC_short_std": float(np.nanstd(df_rankic_short.iloc[:, j].values, ddof=1)),
                 "HitRate_mean": float(np.nanmean(df_hit.iloc[:, j].values)),
                 "AUC_mean": float(np.nanmean(df_auc.iloc[:, j].values)),
                 "TopBottomSpread_mean": float(np.nanmean(qspread[:, j])),
