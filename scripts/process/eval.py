@@ -26,13 +26,13 @@ def main(
     config = json.load(open(config_path))
     compute_rank = config.get('dataset', {}).get('rank_features', False)
 
-    factor_group_name = 'default'
-    target_group_name = 'targets_with_costs_10m_3D_with_rank'
+    factor_group_name = config.get('dataset', {}).get('factor_group', 'default')
+    target_group_name = config.get('dataset', {}).get('target_group', 'targets_with_costs_10m_3D_with_rank')
     inference_processor = ModelInferenceProcessor(config=config_path, epoch=epoch)
     evaluator = EvaluatorProcessor(
-        model_name=name, 
-        epoch=epoch,
-        targets_name=target_group_name, 
+        pred_name=f'inference_{name}',
+        output_name=f'{name}/eval_epoch{epoch:02d}',
+        targets_name=f'factors_{target_group_name}', 
         pred_fields=inference_processor.pred_fields, 
         target_fields=inference_processor.pred_fields
     )
