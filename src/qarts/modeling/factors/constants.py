@@ -30,6 +30,7 @@ class FactorNames:
 
     # transform
     ABS_TRANSFORM = 'abs'
+    DIV_TRANSFORM = 'div'
 
     # selction
     DAILY_RECENT_VACANCY = 'daily_recent_vacancy'
