@@ -9,6 +9,22 @@ __all__ = [
     'AbsTransform',
 ]
 
+@register_factor(FactorNames.ID_TRANSFORM)
+class IdTransform(FactorFromDailyAndIntraday):
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        if ContextSrc.INTRADAY_QUOTATION in self.input_fields:
+            self.factor_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION][0]
+        else:
+            self.factor_field = self.input_fields[ContextSrc.FACTOR_CACHE][0]
+
+    @property
+    def name(self) -> str:
+        return f'{FactorNames.ID_TRANSFORM}_{self.factor_field}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        out[:] = ops.now(self.factor_field)
+
 
 @register_factor(FactorNames.ABS_TRANSFORM)
 class AbsTransform(FactorFromDailyAndIntraday):
