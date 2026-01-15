@@ -152,10 +152,14 @@ class Trainer:
             for i, batch in enumerate(dataloader):
                 X = batch['features'].to(dtype=self.dtype, device=self.device)
                 y = batch['targets'].to(dtype=self.dtype, device=self.device)
+                if 'positional_encodings' in batch:
+                    pos_idx = batch['positional_encodings'].to(device=self.device)
+                else:
+                    pos_idx = None
                 B = X.shape[0]
 
                 self.optimizer.zero_grad()
-                preds = self.model(X)
+                preds = self.model(X, pos_idx)
                 if isinstance(loss_fn, HybridLoss):
                     loss_fn.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
                     evaluator.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
@@ -182,4 +186,4 @@ class Trainer:
                     detailed_eval_results = ', '.join([f'{n}: {v:.4f}' for n, v in eval_results.items()])
                     logger.info(f"Step {step:05d}(E{epoch}), Eval: {detailed_eval_results}")
                 step += 1
-        self.save_model(epoch)
+        self.save_model(num_epochs)

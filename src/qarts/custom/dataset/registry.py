@@ -40,27 +40,34 @@ def collate_sequence(batch):
 def collate_sample_intraday(batch, period: tuple[int, int], sample_num: int = 1):
     assert len(batch) == 1, "Batch size must be 1"
     batch = batch[0]
+    instruments = batch["instruments"]
     X = batch["features"] # F, N, T
     y = batch["targets"] # F, N, T
     is_valid_instruments = batch["is_valid_instruments"]
     X = X[:, is_valid_instruments]
     y = y[:, is_valid_instruments]
+    instruments = instruments[is_valid_instruments]
     F, N, T = X.shape
     t0, t1 = period
     t_idx = np.random.randint(t0, t1, size=N)
+    position_encoding = ((t_idx - t0) / (t1 - t0) * 240).astype(np.int64)
     X = X[:, np.arange(N), t_idx].T
     y = y[:, np.arange(N), t_idx].T
     if 'selector' in batch:
-        selector = batch['selector']
+        selector = batch['selector'] # N, T
         selector = selector[is_valid_instruments]
-        selector = selector[np.arange(N), t_idx]
+        selector = selector[np.arange(N), t_idx] # N
         X = X[selector]
         y = y[selector]
+        position_encoding = position_encoding[selector]
+        t_idx = t_idx[selector]
+        instruments = instruments[selector]
     return {
-        'features': torch.tensor(X), 
-        'targets': torch.tensor(y), 
-        'timesteps': torch.tensor(t_idx),
-        'instruments': batch['instruments'][is_valid_instruments],    
+        'features': torch.tensor(X, dtype=torch.float32), 
+        'targets': torch.tensor(y, dtype=torch.float32), 
+        'timesteps': torch.tensor(t_idx, dtype=torch.int64),
+        'positional_encodings': torch.tensor(position_encoding, dtype=torch.int64),
+        'instruments': torch.tensor(instruments.astype(np.int64), dtype=torch.int64),    
         'feature_names': batch['feature_names'],
         'target_names': batch['target_names']
     }

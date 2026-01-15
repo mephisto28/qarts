@@ -146,7 +146,7 @@ class IntradayDataset(data.Dataset):
         factors_block = self.factor_pipeline(context)
         filters_block = self.filter_pipeline(context)
         targets_block = self.target_pipeline(context_future)
-        selector = np.all(filters_block.data > 0, axis=0)
+        selector = np.all(filters_block.data > 0, axis=0) # N, T
         return {
             "features": factors_block.data,
             "targets": targets_block.data,

@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+from loguru import logger
 from .registery import register_model
 
 __all__ = ['ResidualMLP', 'DualMLP']
@@ -74,6 +76,23 @@ class ResidualMLPBlock(nn.Module):
             return residual + out
 
 
+def get_time_embedding(time_indices, d_model=8, max_t=240):
+    """
+    time_indices: 形状为 (batch_size,) 的张量，存储分钟序号 (1-240)
+    d_model: 输出的编码维度
+    """
+    assert d_model % 2 == 0
+    
+    device = time_indices.device
+    div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(np.log(500.0) / d_model)).to(device)
+    
+    t = time_indices.unsqueeze(1).float()
+    pe = torch.zeros(time_indices.size(0), d_model).to(device)
+    pe[:, 0::2] = torch.sin(t * div_term)
+    pe[:, 1::2] = torch.cos(t * div_term)
+    return pe
+
+
 @register_model('mlp')
 class ResidualMLP(nn.Module):
     def __init__(
@@ -89,16 +108,21 @@ class ResidualMLP(nn.Module):
         use_final_norm=False,
         use_pre_bn=False,
         use_pre_ln=False,
+        use_positional_encoding=False,
+        pe_dim=64
     ):
         super().__init__()
         self.use_pre_bn = use_pre_bn
         self.use_pre_ln = use_pre_ln
+        self.use_positional_encoding = use_positional_encoding
         if use_pre_bn:
             self.in_norm = nn.BatchNorm1d(input_dim, affine=False, momentum=0.01)
         elif use_pre_ln:
             self.in_norm = nn.LayerNorm(input_dim, bias=False)
         self.in_projection = nn.Linear(input_dim, hidden_dim)
-
+        if self.use_positional_encoding:
+            self.pe_dim = pe_dim
+            self.pos_proj = nn.Linear(pe_dim, hidden_dim)
         self.blocks = nn.ModuleList([
             ResidualMLPBlock(
                 dim=hidden_dim,
@@ -114,10 +138,15 @@ class ResidualMLP(nn.Module):
         if use_final_norm:
             self.final_norm = nn.LayerNorm(output_dim)
 
-    def forward(self, x):
+    def forward(self, x, pos_idx=None):
         if self.use_pre_bn or self.use_pre_ln:
             x = self.in_norm(x)
         x = self.in_projection(x)
+
+        if self.use_positional_encoding:
+            pos_emb = get_time_embedding(pos_idx, d_model=self.pe_dim)
+            x = x + self.pos_proj(pos_emb)
+
         for block in self.blocks:
             x = block(x)
         x = self.out_projection(x)
@@ -141,6 +170,7 @@ class DualMLP(nn.Module):
         use_final_norm=False,
         use_pre_bn=False,
         use_pre_ln=False,
+        use_positional_encoding=False,
     ):
         super().__init__()
         self.use_pre_bn = use_pre_bn
@@ -149,6 +179,8 @@ class DualMLP(nn.Module):
             self.in_norm = nn.BatchNorm1d(input_dim, affine=False, momentum=0.01)
         elif use_pre_ln:
             self.in_norm = nn.LayerNorm(input_dim, bias=False)
+        if use_positional_encoding:
+            self.pos_proj = nn.Linear(240, hidden_dim)
         self.in_projection = nn.Linear(input_dim, hidden_dim)
 
         self.blocks1 = nn.ModuleList([
