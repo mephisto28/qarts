@@ -53,6 +53,7 @@ class ModelInferenceProcessor(Processor):
         self.model_name = model_name
         self.factor_group_name = factor_group_name
         self.pred_fields = output_fields
+        self.batch_size = 256
         self.model: nn.Module = self.create_model()
         logger.info(f'Creating {model_name} output: {output_fields} Epoch: {epoch}')
 
@@ -93,7 +94,13 @@ class ModelInferenceProcessor(Processor):
         X = X[factors_block.is_valid_instruments]
         X = torch.tensor(X, dtype=self.dtype, device=self.device)
         with torch.no_grad():
-            preds = self.model(X)
+            preds = []
+            num_batches = int(np.ceil(X.shape[0] / self.batch_size))
+            for i in range(num_batches):
+                start_idx = i * self.batch_size
+                end_idx = min(start_idx + self.batch_size, X.shape[0])
+                preds.append(self.model(X[start_idx:end_idx]))
+            preds = torch.cat(preds, dim=0)
         preds = preds.cpu().numpy()
         return PanelBlockDense(
             instruments=factors_block.instruments[factors_block.is_valid_instruments],

@@ -121,13 +121,13 @@ class EvaluatorProcessor(Processor):
         return f'{name:<18}:\t' + ' '.join([f'{v:.4f}' for v in self.metrics[-1][name]])
 
     def sample_execution_period(self, arr: np.ndarray) -> np.ndarray:
-        t = arr.shape[0]
+        t = arr.shape[1]
         if self.execution_period == 'close':
             near_close_idx = int(t // 8 * 7)
-            return arr[near_close_idx:]
+            return arr[:, near_close_idx:]
         elif self.execution_period == 'open':
             near_open_idx = int(t // 8)
-            return arr[:near_open_idx]
+            return arr[:, :near_open_idx]
         elif self.execution_period == 'all':
             return arr
         else:
