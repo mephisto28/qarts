@@ -8,7 +8,7 @@ import wandb
 from loguru import logger
 from torch.utils.data import DataLoader
 
-from qarts.modeling.nn import ResidualMLP
+from qarts.modeling.nn import get_model
 from qarts.custom.dataset import get_dataset, get_collate_fn, CrossBatchDataLoader
 from qarts.modeling.objectives import get_loss_fn, HybridLoss, HybridEvaluator
 
@@ -40,11 +40,8 @@ class Trainer:
 
     def prepare_model(self):
         self.model_config = self.config['model']
-        self.model_type = self.model_config['type']
-        if self.model_type == 'mlp':
-            self.model = ResidualMLP(**self.model_config['params'])
-        else:
-            raise ValueError(f'Model type {self.model_type} not supported')
+        Model = get_model(self.model_config['type'])
+        self.model = Model(**self.model_config['params'])
         self.model.to(dtype=self.dtype, device=self.device)
         return self.model
 
@@ -164,9 +161,11 @@ class Trainer:
                     evaluator.set_input_specs(input_columns=batch['target_names'], target_columns=batch['target_names'])
                 loss, loss_info = loss_fn(preds, y)
                 eval_results = evaluator(preds, y)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                self.optimizer.step()
+
+                if torch.isfinite(loss):
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                    self.optimizer.step()
                 self.lr_scheduler.step()
                 lr = self.optimizer.param_groups[0]['lr']
                 current_timestamp = time.time()
@@ -183,3 +182,4 @@ class Trainer:
                     detailed_eval_results = ', '.join([f'{n}: {v:.4f}' for n, v in eval_results.items()])
                     logger.info(f"Step {step:05d}(E{epoch}), Eval: {detailed_eval_results}")
                 step += 1
+        self.save_model(epoch)

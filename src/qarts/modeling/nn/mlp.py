@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .registery import register_model
 
+__all__ = ['ResidualMLP', 'DualMLP']
+
 
 class SwiGLU(nn.Module):
     def __init__(self, dim_in, dim_hidden):
@@ -122,3 +124,75 @@ class ResidualMLP(nn.Module):
         if hasattr(self, "final_norm"):
             x = self.final_norm(x)
         return x
+
+
+@register_model('dual_mlp')
+class DualMLP(nn.Module):
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim,
+        output_dims,
+        num_blocks,
+        dropout=0.0,
+        use_post_ln=False,
+        use_swiglu=False,
+        stochastic_depth_prob=0.0,
+        use_final_norm=False,
+        use_pre_bn=False,
+        use_pre_ln=False,
+    ):
+        super().__init__()
+        self.use_pre_bn = use_pre_bn
+        self.use_pre_ln = use_pre_ln
+        if use_pre_bn:
+            self.in_norm = nn.BatchNorm1d(input_dim, affine=False, momentum=0.01)
+        elif use_pre_ln:
+            self.in_norm = nn.LayerNorm(input_dim, bias=False)
+        self.in_projection = nn.Linear(input_dim, hidden_dim)
+
+        self.blocks1 = nn.ModuleList([
+            ResidualMLPBlock(
+                dim=hidden_dim,
+                hidden_dim=hidden_dim,
+                dropout=dropout,
+                use_post_ln=use_post_ln,
+                use_swiglu=use_swiglu,
+                stochastic_depth_prob=stochastic_depth_prob,
+            )
+            for _ in range(num_blocks)
+        ])
+        self.blocks2 = nn.ModuleList([
+            ResidualMLPBlock(
+                dim=hidden_dim,
+                hidden_dim=hidden_dim,
+                dropout=dropout,
+                use_post_ln=use_post_ln,
+                use_swiglu=use_swiglu,
+                stochastic_depth_prob=stochastic_depth_prob,
+            )
+            for _ in range(num_blocks)
+        ])
+        self.out1 = nn.Linear(hidden_dim, output_dims[0])
+        self.out2 = nn.Linear(hidden_dim, output_dims[1])
+        if use_final_norm:
+            self.final_norm1 = nn.LayerNorm(output_dims[0])
+            self.final_norm2 = nn.LayerNorm(output_dims[1])
+
+    def forward(self, x):
+        if self.use_pre_bn or self.use_pre_ln:
+            x = self.in_norm(x)
+        x = x0 = self.in_projection(x)
+        for block in self.blocks1:
+            x = block(x)
+        y1 = self.out1(x)
+        if hasattr(self, "final_norm1"):
+            y1 = self.final_norm1(y1)
+        
+        x = x0
+        for block in self.blocks2:
+            x = block(x)
+        y2 = self.out2(x)
+        if hasattr(self, "final_norm2"):
+            y2 = self.final_norm2(y2)
+        return torch.cat([y1, y2], dim=-1)
