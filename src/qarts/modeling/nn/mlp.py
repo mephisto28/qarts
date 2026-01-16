@@ -155,8 +155,68 @@ class ResidualMLP(nn.Module):
         return x
 
 
+
 @register_model('dual_mlp')
 class DualMLP(nn.Module):
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim,
+        output_dims,
+        num_blocks,
+        dropout=0.0,
+        use_post_ln=False,
+        use_swiglu=False,
+        stochastic_depth_prob=0.0,
+        use_final_norm=False,
+        use_pre_bn=False,
+        use_pre_ln=False,
+        use_positional_encoding=False,
+        pe_dim=64,
+        compose_output=False,
+    ):
+        super().__init__()
+        self.mlp1 = ResidualMLP(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dims[0],
+            num_blocks=num_blocks,
+            dropout=dropout,
+            use_post_ln=use_post_ln,
+            use_swiglu=use_swiglu,
+            use_final_norm=use_final_norm,
+            use_positional_encoding=use_positional_encoding,
+            pe_dim=pe_dim,
+        )
+        self.mlp2 = ResidualMLP(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dims[1],
+            num_blocks=num_blocks,
+            dropout=dropout,
+            use_post_ln=use_post_ln,
+            use_swiglu=use_swiglu,
+            use_final_norm=use_final_norm,
+            use_positional_encoding=use_positional_encoding,
+            pe_dim=pe_dim,
+        )
+        self.compose_output = compose_output
+
+    def forward(self, x, pos_idx):
+        y1 = self.mlp1(x, pos_idx)
+        y2 = self.mlp2(x, pos_idx)
+        if self.compose_output:
+            progress = pos_idx.to(dtype=torch.float32) / 240
+            progress_weights = torch.stack([progress / 3 / 3, progress / 3 / 2, progress / 3], dim=-1)
+            y3 = y1 + y2[..., :1] * progress_weights
+            y = torch.cat([y1, y2, y3], dim=-1)
+        else:
+            y = torch.cat([y1, y2], dim=-1)
+        return y
+
+
+@register_model('dual_head_mlp')
+class DualHeadMLP(nn.Module):
     def __init__(
         self,
         input_dim,
