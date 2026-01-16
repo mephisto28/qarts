@@ -1,6 +1,8 @@
 import math
 import typing as T
 import numpy as np
+import pandas as pd
+from numba import njit, prange
 
 try:
     from scipy.stats import rankdata
@@ -192,7 +194,7 @@ def newey_west_tstat(x: np.ndarray, lag: int = 0) -> float:
     return float(mu / se_mean)
 
 
-def quantile_stats_one_column(sig: np.ndarray, ret: np.ndarray, q: int = 10) -> T.Tuple[np.ndarray, float, float, float]:
+def quantile_stats_one_column(sig: np.ndarray, ret: np.ndarray, q: int = 10, top_counts: T.Tuple[int] = (20, 50, 100)) -> T.Tuple[np.ndarray, float, float, float]:
     """
     For a single cross-section column:
       - quantile mean returns (length q)
@@ -213,13 +215,16 @@ def quantile_stats_one_column(sig: np.ndarray, ret: np.ndarray, q: int = 10) -> 
 
     # quantile edges by equal counts
     idx = np.linspace(0, n, q + 1).astype(int)
-    q_means = np.empty(q, dtype=float)
+    q_means = np.empty(q + len(top_counts), dtype=float)
     for i in range(q):
         sl = slice(idx[i], idx[i + 1])
         r = ret_s[sl]
         q_means[i] = np.nanmean(r) if r.size else np.nan
+    for i, count in enumerate(top_counts):
+        r = ret_s[-count:]
+        q_means[q + i] = np.nanmean(r) if r.size else np.nan
 
-    top = q_means[-1]
+    top = q_means[q-1]
     bot = q_means[0]
     spread = top - bot
 
@@ -229,10 +234,10 @@ def quantile_stats_one_column(sig: np.ndarray, ret: np.ndarray, q: int = 10) -> 
         # Spearman via ranks of q_means
         if rankdata is not None:
             r1 = rankdata(qi, method="average")
-            r2 = rankdata(q_means, method="average")
+            r2 = rankdata(q_means[:q], method="average")
             mono = np.corrcoef(r1, r2)[0, 1]
         else:
-            mono = np.corrcoef(qi, q_means)[0, 1]
+            mono = np.corrcoef(qi, q_means[:q])[0, 1]
     else:
         mono = np.nan
 
@@ -288,3 +293,130 @@ def value_bucket_stats_one_column(sig: np.ndarray, ret: np.ndarray, bins: np.nda
             else:
                 bucket_centers[i] = 0.0
     return bucket_centers, bucket_means
+
+
+# 定义分桶的配置 (常量)
+# 0-98: 每 1% 一个桶 (共99个)
+# 99: 99% - 99.5%
+# 100: 99.5% - 99.9%
+# 101: 99.9% - 99.95%
+# 102: 99.95% - 99.99%
+# 103: > 99.99%
+NUM_BINS = 104
+
+@njit(fastmath=True, cache=True)
+def _get_bin_index(q: float) -> int:
+    """
+    将分位数映射到 0-103 的桶索引。
+    硬编码判断逻辑以获得最高执行速度。
+    """
+    if q < 0.99:
+        # 0.00 ~ 0.9899... -> 0 ~ 98
+        return int(q * 100)
+    
+    # 处理尾部高精度分位
+    if q < 0.995:
+        return 99
+    elif q < 0.999:
+        return 100
+    elif q < 0.9995:
+        return 101
+    elif q < 0.9999:
+        return 102
+    else:
+        return 103
+
+@njit(parallel=True)
+def _accumulate_daily_stats(
+    quantiles: np.ndarray,      # (N_samples, n_scales)
+    gts: np.ndarray,            # (N_samples, n_scales)
+    out_sums: np.ndarray,       # (n_scales, NUM_BINS) 累加器引用
+    out_counts: np.ndarray      # (n_scales, NUM_BINS) 计数器引用
+):
+    """
+    核心累加逻辑。
+    单线程执行即可，因为直接操作内存比并行加锁更快。
+    处理 120万行 * 10列 仅需几十毫秒。
+    """
+    n_samples, n_scales = quantiles.shape
+    
+    for i in prange(n_samples):
+        for scale_idx in range(n_scales):
+            q_val = quantiles[i, scale_idx]
+            gt_val = gts[i, scale_idx]
+            
+            # 过滤无效数据 (NaN in Score or NaN in GT)
+            if np.isnan(q_val) or np.isnan(gt_val):
+                continue
+            
+            # 1. 计算桶索引
+            bin_idx = _get_bin_index(q_val)
+            
+            # 2. 原地累加 (In-place update)
+            out_sums[scale_idx, bin_idx] += gt_val
+            out_counts[scale_idx, bin_idx] += 1.0
+
+
+class GlobalQuantileAnalyzer:
+    def __init__(self, num_variables: int = 10):
+        self.num_variables = num_variables
+        self.num_bins = 104
+        
+        # 状态矩阵：(Scale, Bin)
+        # 使用 float64 防止溢出
+        self.total_return_sums = np.zeros((num_variables, self.num_bins), dtype=np.float64)
+        self.total_counts = np.zeros((num_variables, self.num_bins), dtype=np.float64)
+        
+        # 定义桶的标签，方便后续展示
+        self.bin_labels = [f"{i}%-{i+1}%" for i in range(99)] + [
+            "99%-99.5%", "99.5%-99.9%", "99.9%-99.95%", "99.95%-99.99%", ">99.99%"
+        ]
+
+    def update(self, daily_score_quantiles: np.ndarray, daily_gts: np.ndarray):
+        if daily_score_quantiles.ndim == 3:
+            N, T, D = daily_score_quantiles.shape
+            # Flatten to (N*T, D)
+            flat_quantiles = daily_score_quantiles.reshape(-1, D)
+            flat_gts = daily_gts.reshape(-1, D)
+        else:
+            flat_quantiles = daily_score_quantiles
+            flat_gts = daily_gts
+            
+        assert flat_quantiles.shape == flat_gts.shape, "Score and GT shapes must match"
+        assert flat_quantiles.shape[1] == self.num_variables, "Scale dimension mismatch"
+        
+        # 3. 累加统计 (Numba 加速)
+        _accumulate_daily_stats(
+            flat_quantiles,
+            flat_gts,
+            self.total_return_sums,
+            self.total_counts
+        )
+
+    def get_report(self, scale_idx: int = None) -> pd.DataFrame:
+        """
+        生成统计报告。
+        :param scale_idx: 如果指定，只返回该尺度的 DataFrame；否则返回所有尺度的 Dict。
+        """
+        # 防止除以 0
+        with np.errstate(divide='ignore', invalid='ignore'):
+            mean_returns = self.total_return_sums / self.total_counts
+            
+        # 封装结果
+        results = {}
+        for s in range(self.num_variables):
+            df = pd.DataFrame({
+                'Bin': self.bin_labels,
+                'Avg_Return': mean_returns[s],
+                'Count': self.total_counts[s],
+                'Sum_Return': self.total_return_sums[s]
+            })
+            results[s] = df
+            
+        if scale_idx is not None:
+            return results[scale_idx]
+        return results
+
+    def reset(self):
+        self.total_return_sums.fill(0)
+        self.total_counts.fill(0)

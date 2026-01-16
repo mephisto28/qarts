@@ -10,6 +10,7 @@ from scipy.stats import rankdata
 import matplotlib.pyplot as plt
 
 from qarts.modeling.objectives import eval_utils
+from qarts.utils.tdigest import QuantileTracker
 from .base import Processor, GlobalContext
 
 
@@ -28,8 +29,10 @@ class EvaluatorProcessor(Processor):
         target_fields: list[str],
         sample_stride: int = 2,
         quantiles: int = 10,
+        top_counts: T.Tuple[int] = (100, 50, 20),
         min_count_xs: int = 200,
         execution_period: str = 'close',
+        eval_quantiles: bool = True,
         output_dir: str = None,
     ):
         self.pred_name = pred_name
@@ -39,9 +42,12 @@ class EvaluatorProcessor(Processor):
         self.target_fields = target_fields
         self.sample_stride = sample_stride
         self.quantiles = quantiles
+        self.top_counts = top_counts
         self.execution_period = execution_period
         self.min_count_xs = min_count_xs
         self.metrics = []
+        self.qtracker = None
+        self.eval_quantiles = eval_quantiles
         
         if output_dir is not None:
             self.output_dir = os.path.join(output_dir, self.output_name)
@@ -71,6 +77,10 @@ class EvaluatorProcessor(Processor):
         if pred_s.shape[-1] == 1:
             pred_s = np.tile(pred_s, (1, 1, gt_s.shape[-1]))
         N, T, D = pred_s.shape
+        if self.eval_quantiles and self.qtracker is None:
+            self.qtracker = QuantileTracker(num_variables=D)
+            self.gret_analyzer = eval_utils.GlobalQuantileAnalyzer(num_variables=D)
+            self.qtracker.update_batch(pred_s.reshape(-1, D))
 
         ic_td = eval_utils.nan_corr_xs(pred_s, gt_s, axis=0, min_count=self.min_count_xs)
         rp = rankdata(pred_s, axis=0, method="average", nan_policy="omit")
@@ -85,16 +95,19 @@ class EvaluatorProcessor(Processor):
             for h in range(D):
                 auc_td[t, h] = eval_utils.auc_binary(gt_s[:, t, h], pred_s[:, t, h])
 
-        qret_tdh = np.full((T, D, self.quantiles), np.nan)
+        qret_tdh = np.full((T, D, self.quantiles + len(self.top_counts)), np.nan)
         qspread_td = np.full((T, D), np.nan)
         qmono_td = np.full((T, D), np.nan)
         tail_td = np.full((T, D), np.nan)
         for t in range(T):
             for h in range(D):
                 qret_tdh[t, h, :], qspread_td[t, h], qmono_td[t, h], tail_td[t, h] = \
-                    eval_utils.quantile_stats_one_column(pred_s[:, t, h], gt_s[:, t, h], q=self.quantiles)
+                    eval_utils.quantile_stats_one_column(pred_s[:, t, h], gt_s[:, t, h], q=self.quantiles, top_counts=self.top_counts)
 
-        # TODO: add more metrics here
+        # quantile return
+        if self.eval_quantiles:
+            q_tdh = self.qtracker.get_cdf_matrix(pred_s.reshape(-1, D)).reshape(N, T, D)
+            self.gret_analyzer.update(q_tdh, gt_s.reshape(-1, D))
 
         self.metrics.append({
             'date': context.current_datetime,
@@ -110,7 +123,7 @@ class EvaluatorProcessor(Processor):
             'eval_qspread': qspread_td.mean(0),
             'eval_qmono': qmono_td.mean(0),
             'eval_tail': tail_td.mean(0),
-            # TODO: add more metrics here
+            'eval_gret': self.gret_analyzer.total_return_sums.copy() if self.eval_quantiles else None,
         })
         logger.info(
             f'{self.metrics[-1]["date"]} {self.output_name} metrics'
@@ -152,6 +165,12 @@ class EvaluatorProcessor(Processor):
 
         # bt_ret = np.vstack(self.daily_bt_ret) if self.daily_bt_ret else np.empty((0, self.D))
         # bt_to = np.vstack(self.daily_bt_turnover) if self.daily_bt_turnover else np.empty((0, self.D))
+        if self.gret_analyzer is not None:
+            gret = np.stack([m['eval_gret'] for m in self.metrics])
+            gret_labels = self.gret_analyzer.bin_labels
+        else:
+            gret = None
+            gret_labels = None
 
         df_ic = pd.DataFrame(ic, index=dates, columns=self.target_fields)
         df_rankic = pd.DataFrame(ric, index=dates, columns=self.target_fields)
@@ -215,6 +234,8 @@ class EvaluatorProcessor(Processor):
             "qspread": qspread,    # (Nd,D)
             "qmono": qmono,        # (Nd,D)
             "tail_spread": tail,   # (Nd,D)
+            "gret": gret,
+            "gret_labels": gret_labels,
             # "bucket_centers": self.bucket_centers,
             # "bucket_ret": bucket,  # (Nd,D,K)
             # "df_bt_ret": df_bt_ret,

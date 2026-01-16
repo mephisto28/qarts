@@ -19,6 +19,7 @@ def main(
     start_date: str = '2023-01-01',
     end_date: str = '2025-07-01',
     overwrite: bool = False,
+    eval_quantiles: bool = False
 ):
     d = os.path.dirname
     project_dir = d(d(d(os.path.abspath(__file__))))
@@ -34,7 +35,8 @@ def main(
         output_name=f'{name}/eval_epoch{epoch:02d}',
         targets_name=f'factors_{target_group_name}', 
         pred_fields=inference_processor.pred_fields, 
-        target_fields=inference_processor.pred_fields
+        target_fields=inference_processor.pred_fields,
+        eval_quantiles=eval_quantiles
     )
     if os.path.exists(os.path.join(evaluator.output_dir, "eval_results.pkl")) and not overwrite:
         logger.info(f"Evaluation results already exist for {name} at epoch {epoch}")
