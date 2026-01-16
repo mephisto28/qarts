@@ -22,8 +22,10 @@ class ModelInferenceProcessor(Processor):
         config: dict | str, 
         epoch: int = -1, 
         output_fields: T.Optional[list[str]] = None, 
+        pred_indices: T.Optional[list[int]] = None,
         device: str = 'cuda', 
-        dtype: torch.dtype = torch.float32
+        dtype: torch.dtype = torch.float32,
+        trange: tuple[int, int] = (200, 238) # near close 
     ):
         if isinstance(config, str):
             model_name = os.path.basename(config).split('.')[0]
@@ -45,6 +47,7 @@ class ModelInferenceProcessor(Processor):
                 alpha_objective = [o for o in objectives if o['name'] == 'alpha']
                 if len(alpha_objective) > 0:
                     output_fields = alpha_objective[0]['target_fields']
+                    pred_indices = alpha_objective[0]['pred_indices']
         
         self.config = model_config
         self.device = device
@@ -53,7 +56,9 @@ class ModelInferenceProcessor(Processor):
         self.model_name = model_name
         self.factor_group_name = factor_group_name
         self.pred_fields = output_fields
+        self.pred_indices = pred_indices
         self.batch_size = 256
+        self.trange = trange
         self.model: nn.Module = self.create_model()
         logger.info(f'Creating {model_name} output: {output_fields} Epoch: {epoch}')
 
@@ -95,12 +100,21 @@ class ModelInferenceProcessor(Processor):
         X = torch.tensor(X, dtype=self.dtype, device=self.device)
         with torch.no_grad():
             preds = []
-            num_batches = int(np.ceil(X.shape[0] / self.batch_size))
-            for i in range(num_batches):
-                start_idx = i * self.batch_size
-                end_idx = min(start_idx + self.batch_size, X.shape[0])
-                preds.append(self.model(X[start_idx:end_idx]))
-            preds = torch.cat(preds, dim=0)
+            B, T, F = X.shape
+            for t in range(T):
+                x = X[:, t, :]
+                pos_idx = (t - self.trange[0]) / (self.trange[1] - self.trange[0]) * 240
+                pos_idx = torch.full((B,), fill_value=int(pos_idx), dtype=torch.int64, device=self.device)
+                preds.append(self.model(x, pos_idx))
+            preds = torch.stack(preds, dim=1)
+            preds = preds[..., self.pred_indices]
+
+            # num_batches = int(np.ceil(X.shape[0] / self.batch_size))
+            # for i in range(num_batches):
+            #     start_idx = i * self.batch_size
+            #     end_idx = min(start_idx + self.batch_size, X.shape[0])
+            #     preds.append(self.model(X[start_idx:end_idx]))
+            # preds = torch.cat(preds, dim=0)
         preds = preds.cpu().numpy()
         return PanelBlockDense(
             instruments=factors_block.instruments[factors_block.is_valid_instruments],
