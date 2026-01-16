@@ -42,6 +42,7 @@ class FactorNames:
 
     # targets
     FUTURE_DAY_TARGETS = 'future_day_targets'
+    INTER_DAY_TARGETS = 'inter_day_targets'
     TODAY_TARGETS = 'today_targets'
     FUTURE_DAY_RANGE_TARGETS = 'future_day_range_targets'
     FUTURE_DAY_UP_RANGE_TARGETS = 'future_day_up_range_targets'

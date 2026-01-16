@@ -38,6 +38,30 @@ class FutureDayTargets(FactorFromDailyAndIntraday):
         # out /= np.sqrt(self.window + 1)
 
 
+@register_factor(FactorNames.INTER_DAY_TARGETS)
+class InterDayTargets(FactorFromDailyAndIntraday):
+    num_intraday_fields = 2
+
+    def __init__(self, input_fields: dict[str, list[str]], window: int = 1, **kwargs):
+        super().__init__(input_fields=input_fields, window=window, **kwargs)
+        self.future_price_field = self.input_fields[ContextSrc.FUTURE_DAILY_QUOTATION][0]
+        self.buy_price_field, self.mid_price_field = self.input_fields[ContextSrc.INTRADAY_QUOTATION]
+
+    @property
+    def name(self) -> str:
+        default_field = 'adjusted_close'
+        if self.future_price_field != default_field:
+            return f'{self.future_price_field}_{FactorNames.INTER_DAY_TARGETS}_{self.window}'
+        return f'{FactorNames.INTER_DAY_TARGETS}_{self.window}'
+
+    def compute_from_context(self, ops: ContextOps, out: np.ndarray):
+        future_values = ops.future_n_days(self.future_price_field, window=self.window)
+        buy_price = ops.now(self.buy_price_field)[:, -1:]
+        mid_price = ops.now(self.mid_price_field)[:, -1:]
+        cur_price = np.where(buy_price == 0, mid_price, buy_price)
+        out[:] = np.log(future_values) - np.log(cur_price)
+
+
 @register_factor(FactorNames.FUTURE_DAY_RANGE_TARGETS)
 class FutureDayRangeTargets(FactorFromDailyAndIntraday):
     num_intraday_fields = 2
@@ -114,8 +138,6 @@ class TodayTargets(FactorFromDailyAndIntraday):
 
     @property
     def name(self) -> str:
-        if self.buy_field != 'ask_price1':
-            return f'{self.buy_field}_{self.sell_field}_{FactorNames.TODAY_TARGETS}_{self.window}'
         return f'{FactorNames.TODAY_TARGETS}_{self.window}'
 
     def compute_from_context(self, ops: ContextOps, out: np.ndarray):
