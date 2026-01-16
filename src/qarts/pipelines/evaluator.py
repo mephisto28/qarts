@@ -47,6 +47,7 @@ class EvaluatorProcessor(Processor):
         self.min_count_xs = min_count_xs
         self.metrics = []
         self.qtracker = None
+        self.gret_analyzer = None
         self.eval_quantiles = eval_quantiles
         
         if output_dir is not None:
@@ -228,6 +229,7 @@ class EvaluatorProcessor(Processor):
             "df_ic": df_ic,
             "df_rankic": df_rankic,
             "df_rankic_long": df_rankic_long,
+            "df_rankic_short": df_rankic_short,
             "df_hit": df_hit,
             "df_auc": df_auc,
             "qret": qret,          # (Nd,D,Q)

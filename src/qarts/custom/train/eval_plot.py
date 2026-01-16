@@ -30,7 +30,7 @@ class HTMLReport:
         b64 = self._fig_to_base64(fig)
         cap = f"<div style='margin:6px 0 18px 0;color:#444;font-size:13px'>{caption}</div>" if caption else ""
         self.sections.append(
-            f"<div><img style='max-width:100%;border:1px solid #ddd' src='data:image/png;base64,{b64}'/></div>{cap}"
+            f"<div style='margin:0px 50px 0px 10px'><img style='max-width:100%;border:1px solid #ddd' src='data:image/png;base64,{b64}'/></div>{cap}"
         )
 
     def add_table(self, df: pd.DataFrame, caption: str = "", floatfmt: str = "{:.6f}", max_rows: int = 50):
@@ -42,7 +42,7 @@ class HTMLReport:
             if np.issubdtype(dfx[c].dtype, np.floating):
                 dfx[c] = dfx[c].map(lambda v: "" if not np.isfinite(v) else floatfmt.format(v))
         html_table = dfx.to_html(escape=False, border=0)
-        cap = f"<div style='margin:6px 0 10px 0;color:#444;font-size:13px'>{caption}</div>" if caption else ""
+        cap = f"<div style='margin:0px 50px 0px 50px;color:#444;font-size:13px'>{caption}</div>" if caption else ""
         self.sections.append(cap + html_table)
 
     def write(self, path: str):
@@ -71,34 +71,40 @@ class HTMLReport:
 # Plot helpers
 # ---------------------------
 
-def plot_ic_decay(df_summary: pd.DataFrame, title: str = "IC / RankIC decay by horizon"):
-    fig = plt.figure()
+def plot_ic_decay(df_summary: pd.DataFrame, title: str = "IC / RankIC decay by horizon", ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 5))
     x = np.arange(len(df_summary))
-    plt.plot(x, df_summary["IC_mean"].values, marker="o", label="IC_mean")
-    plt.plot(x, df_summary["RankIC_mean"].values, marker="o", label="RankIC_mean")
-    plt.plot(x, df_summary["RankIC_long_mean"].values, marker="o", label="RankIC_long_mean")
-    plt.axhline(0.0, linewidth=1)
-    plt.xticks(x, df_summary.index.tolist(), rotation=30, ha="right")
-    plt.title(title)
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    return fig
+    ax.plot(x, df_summary["IC_mean"].values, marker="o", label="IC_mean")
+    ax.plot(x, df_summary["RankIC_mean"].values, marker="o", label="RankIC_mean")
+    ax.plot(x, df_summary["RankIC_long_mean"].values, marker="o", label="RankIC_long_mean")
+    ax.axhline(0.0, linewidth=1)
+    ax.set_xticks(x)
+    ax.set_xticklabels(df_summary.index.tolist(), rotation=30, ha="right")
+    ax.set_title(title)
+    ax.minorticks_on()
+    ax.grid(which='major')
+    ax.grid(which='minor', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax.legend()
+    return ax.figure
 
 
-def plot_daily_series(df: pd.DataFrame, title: str, ylabel: str, base_value: float = 0.0):
-    fig = plt.figure()
+def plot_daily_series(df: pd.DataFrame, title: str, ylabel: str, base_value: float = 0.0, ax=None):
+
     for c in df.columns:
         s_acc = (df[c] - base_value).cumsum() / len(df)
-        plt.plot(df.index, s_acc, label=c, linewidth=1)
-    plt.axhline(0.0, linewidth=1)
-    plt.title(title)
-    plt.ylabel(ylabel)
-    plt.xticks(rotation=30, ha="right")
-    plt.grid(True)
-    plt.legend(ncol=2, fontsize=8)
-    plt.tight_layout()
-    return fig
+        ax.plot(df.index, s_acc, label=c, linewidth=1)
+
+    ax.axhline(0.0, linewidth=1)
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    # ax.xticks(rotation=30, ha="right")
+    ax.tick_params(axis='x', rotation=30)
+    ax.minorticks_on()
+    ax.grid(which='major')
+    ax.grid(which='minor', linestyle='--', linewidth=0.5, alpha=0.5)
+    ax.legend(ncol=2, fontsize=8)
+    return ax.figure
 
 
 def plot_intraday_heatmap(mat: np.ndarray, horizons: list[str], title: str, minute_stride: int):
@@ -116,22 +122,25 @@ def plot_intraday_heatmap(mat: np.ndarray, horizons: list[str], title: str, minu
     return fig
 
 
-def plot_quantile_curve(qret_mean: np.ndarray, horizons: list[str], title: str):
+def plot_quantile_curve(qret_mean: np.ndarray, horizons: list[str], title: str, ax=None):
     """
     qret_mean: (D,Q) average quantile return
     """
-    fig = plt.figure()
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 5))
+
     Q = qret_mean.shape[1]
     x = np.arange(1, Q + 1)
     for i, h in enumerate(horizons):
-        plt.plot(x, qret_mean[i], marker="o", label=h)
-    plt.title(title)
-    plt.xlabel("Quantile (low -> high)")
-    plt.axhline(0.0, linewidth=1)
-    plt.legend(ncol=2, fontsize=8)
-    plt.grid(True)
-    plt.tight_layout()
-    return fig
+        ax.plot(x, qret_mean[i], marker="o", label=h)
+    ax.set_title(title)
+    ax.set_xlabel("Quantile (low -> high)")
+    ax.axhline(0.0, linewidth=1)
+    ax.legend(ncol=2, fontsize=8)
+    ax.minorticks_on()
+    ax.grid(which='major')
+    ax.grid(which='minor', linestyle='--', linewidth=0.5, alpha=0.5)
+    return ax.figure
 
 
 def plot_bucket_curve(bucket_centers: np.ndarray, bucket_mean: np.ndarray, horizons: list[str], title: str):
@@ -145,7 +154,7 @@ def plot_bucket_curve(bucket_centers: np.ndarray, bucket_mean: np.ndarray, horiz
     plt.xlabel("Signal z-score bucket center")
     plt.axhline(0.0, linewidth=1)
     plt.legend(ncol=2, fontsize=8)
-    plt.grid(True)
+    plt.grid(which='both')
     plt.tight_layout()
     return fig
 
@@ -183,18 +192,60 @@ def build_report(eval_dir: str):
     rpt.add_table(res["df_summary"].round(6), caption="Summary metrics by horizon (selected key indicators).", max_rows=200)
 
     rpt.add_markdown_like("<h2>Predictive Power</h2>")
-    rpt.add_figure(plot_ic_decay(res["df_summary"]), caption="IC and RankIC mean across horizons (decay curve).")
-    rpt.add_figure(plot_daily_series(res["df_ic"], "Daily IC (mean over minutes)", "IC"), caption="Daily IC time series by horizon.")
-    rpt.add_figure(plot_daily_series(res["df_rankic"], "Daily RankIC (mean over minutes)", "RankIC"), caption="Daily RankIC time series by horizon.")
-    rpt.add_figure(plot_daily_series(res["df_rankic_long"], "Daily RankIC Long (mean over minutes)", "RankIC Long"), caption="Daily RankIC Long time series by horizon.")
-    rpt.add_figure(plot_daily_series(res["df_hit"], "Daily Hit Rate (mean over minutes)", "Hit Rate", base_value=0.5), caption="Directional hit rate (gt>0 vs pred>0).")
-    rpt.add_figure(plot_daily_series(res["df_auc"], "Daily AUC (mean over minutes)", "AUC", base_value=0.5), caption="AUC by day and horizon (gt>0 as positive label).")
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    plot_ic_decay(res["df_summary"], ax=axes[0])
+    qret_mean = np.nanmean(res["qret"], axis=0) if res["qret"].size else None  # (D,Q)
+    plot_quantile_curve(qret_mean, list(res['df_rankic'].columns), "Average quantile return curve (cross-section)", ax=axes[1])
+    plt.tight_layout()
+    rpt.add_figure(fig, caption="(1) IC and RankIC mean across horizons (decay curve). (2) Mean forward return per signal quantile (low->high), averaged across all minutes and days.")
+    
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    captions = []
+    captions.append("Daily IC time series by horizon.")
+    plot_daily_series(res["df_ic"], "Daily IC (mean over minutes)", "IC", ax=axes[0, 0])
+    captions.append("Daily RankIC time series by horizon.")
+    plot_daily_series(res["df_rankic"], "Daily RankIC (mean over minutes)", "RankIC", ax=axes[0, 1])
+    captions.append("Daily RankIC Long time series by horizon.")
+    plot_daily_series(res["df_rankic_long"], "Daily RankIC Long (mean over minutes)", "RankIC Long", ax=axes[1, 0])
+    if 'df_rankic_short' in res:
+        captions.append("Daily RankIC Short time series by horizon.")
+        plot_daily_series(res["df_rankic_short"], "Daily RankIC Short (mean over minutes)", "RankIC Short", ax=axes[1, 1])
+    plt.tight_layout()
+    rpt.add_figure(fig, caption=" ".join([f"({i+1}) {c}" for i,c in enumerate(captions)]))
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    captions = []
+    captions.append("Directional hit rate (gt>0 vs pred>0).")
+    plot_daily_series(res["df_hit"], "Daily Hit Rate (mean over minutes)", "Hit Rate", base_value=0.5, ax=axes[0])
+    captions.append("AUC by day and horizon (gt>0 as positive label).")
+    plot_daily_series(res["df_auc"], "Daily AUC (mean over minutes)", "AUC", base_value=0.5, ax=axes[1])
+    plt.tight_layout()
+    rpt.add_figure(fig, caption=" ".join([f"({i+1}) {c}" for i,c in enumerate(captions)]))
+
+    rpt.add_markdown_like("<h2> Simulated Simple Backtest </h2>")
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+    idx = list(res['df_rankic'].columns).index('future_day_targets_1')
+    qret_tdh = res['qret'] # TDH
+    qret_th = qret_tdh[:, idx, :] # TH
+    acc_ret = 1 + np.cumsum(qret_th, axis=0)
+    for i in range(acc_ret.shape[1]):
+        ax.plot(res["df_ic"].index, acc_ret[:, i], label=f'Quantile {i+1}')
+    ax.legend()
+    ax.set_title('Accumulated Return by Quantile')
+    ax.set_xlabel('Day')
+    ax.set_ylabel('Return')
+    ax.minorticks_on()
+    ax.grid(which='major')
+    ax.grid(which='minor', linestyle='--', linewidth=0.5, alpha=0.5)
+    plt.tight_layout()
+    rpt.add_figure(fig, caption='TH')
+
+    
 
     # Quantile curves
-    qret_mean = np.nanmean(res["qret"], axis=0) if res["qret"].size else None  # (D,Q)
-    if qret_mean is not None:
-        rpt.add_figure(plot_quantile_curve(qret_mean, list(res['df_rankic'].columns), "Average quantile return curve (cross-section)"),
-                    caption="Mean forward return per signal quantile (low->high), averaged across all minutes and days.")
+
     # bucket_mean = np.nanmean(res["bucket_ret"], axis=0) if res["bucket_ret"].size else None  # (D,K)
     # if bucket_mean is not None:
     #     rpt.add_figure(plot_bucket_curve(res["bucket_centers"], bucket_mean, res["horizons"], "Average value-bucket return curve"),
